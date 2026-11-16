@@ -6,6 +6,30 @@ Live verification of every tool, run against a real signed-in session.
 - **Tested on:** Google Chrome, Linux
 - **Test account:** a second account
 
+## Round 2 sweep (16 November 2026, later)
+
+A second full sweep of all 34 tools (dry run) reported 26 working, 4 partial
+and 4 broken. Live DOM diagnosis found the root causes, all of them Instagram
+layout changes, and each fix is covered by local fixture tests
+(`test/dom.test.mjs`, 10 cases) plus the protocol suite:
+
+- `followers_list` / `following_list`: the profile stats are links with
+  `href="#"`; the dialog opens by script. The tools now click the stat by its
+  text, recognize the dialog by its heading, and scroll it.
+- `dm_send_to_user`: the profile Message button opens a floating chat panel
+  on the profile page instead of navigating to a thread URL. Both flows are
+  now handled.
+- `search`: the search input can be covered by its own pill button, which
+  failed the click actionability check. The click is now layered and typing
+  goes through the page keyboard.
+- `post_comments`: comments are stacked blocks in the right column, not list
+  items. Rows are now extracted from their Reply element, and the column is
+  scrolled to load more.
+- `comment_like`: the like button is now tagged on the smallest matching
+  comment row instead of being searched inside a hovered list item.
+
+The 3 story tools remain blocked by Instagram Web itself, as recorded above.
+
 ## Live results
 
 | Tool | Result |
