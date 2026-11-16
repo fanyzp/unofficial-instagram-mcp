@@ -17,6 +17,7 @@ user's password. All tools act on the visible web interface via Playwright over 
 ## Setup, if the server is not connected yet
 
 1. Fastest path: run `npx github:fanyzp/unofficial-instagram-mcp install --harness <your-harness-id> --scope user --yes`.
+   To update an existing install later, run `npx github:fanyzp/unofficial-instagram-mcp update`.
    It registers the server and installs this skill in one run. Keep `IG_DRY_RUN=true`.
    Manual alternative: register the server with command `npx` and args
    `["-y", "github:fanyzp/unofficial-instagram-mcp"]`, env `CDP_URL=http://127.0.0.1:9222`

@@ -10,6 +10,30 @@ An unofficial Model Context Protocol (MCP) server for Instagram Web. It gives an
 
 The server connects to a Chrome window that is already signed in to Instagram. It does not use the Meta API, and it does not ask for or store an Instagram password.
 
+## Quick start (no clone needed)
+
+One command installs everything into your agent: it registers the MCP server and installs the Agent Skill. Pick your harness in the menu.
+
+```bash
+npx github:fanyzp/unofficial-instagram-mcp install
+```
+
+Or register the server in your MCP client config and let it run through npx directly:
+
+```json
+{
+  "mcpServers": {
+    "instagram": {
+      "command": "npx",
+      "args": ["-y", "github:fanyzp/unofficial-instagram-mcp"],
+      "env": { "CDP_URL": "http://127.0.0.1:9222", "IG_DRY_RUN": "true" }
+    }
+  }
+}
+```
+
+Then start Chrome as described below and call `ig_status`. Prefer working from source instead? Use the clone based install after this section.
+
 > **Test first.** After connecting, run the built-in self-test to make sure every feature works end to end on your setup: call the `ig_selftest` tool or run `npm run selftest`. The default level only reads. The full level (`npm run selftest -- full`) exercises every write function on content it creates itself, then deletes all of it at the end. **Use a second account for testing, not your main account.**
 
 ## What it does
@@ -26,14 +50,12 @@ Use it to:
 
 The MCP tools use standard annotations. Read tools use `readOnlyHint`, and write tools use `destructiveHint`. The server also returns instructions that tell the agent to call `ig_status` first and to respect the `dryRun`, `sent`, and `alreadyLiked` fields in tool results.
 
-## Screenshots
+## In use
+
+An agent session in OpenCode, working through the MCP tools:
 
 <p align="center">
-  <img src="docs/assets/screenshots/tui-menu.png" alt="TUI menu" width="520">
-</p>
-
-<p align="center">
-  <img src="docs/assets/screenshots/test-results.png" alt="MCP protocol test results" width="920">
+  <img src="docs/assets/screenshots/opencode-search.png" alt="Agent session using the Instagram MCP tools in OpenCode" width="920">
 </p>
 
 ## How it works
@@ -60,29 +82,15 @@ All actions use the visible Instagram web interface. The project does not call p
 - An Instagram account signed in in that browser
 - An MCP client, if you plan to use the MCP server
 
-## Quick start (no clone needed)
+## Updating
 
-One command installs everything into your agent: it registers the MCP server and installs the Agent Skill. Pick your harness in the menu.
+Run the update command. It re-runs the installer with `--force`, which refreshes the Agent Skill files and rewrites the MCP registration with the latest version:
 
 ```bash
-npx github:fanyzp/unofficial-instagram-mcp install
+npx github:fanyzp/unofficial-instagram-mcp update
 ```
 
-Or register the server in your MCP client config and let it run through npx directly:
-
-```json
-{
-  "mcpServers": {
-    "instagram": {
-      "command": "npx",
-      "args": ["-y", "github:fanyzp/unofficial-instagram-mcp"],
-      "env": { "CDP_URL": "http://127.0.0.1:9222", "IG_DRY_RUN": "true" }
-    }
-  }
-}
-```
-
-Then start Chrome as described below and call `ig_status`. Prefer working from source instead? Use the clone based install after this section.
+Installed from a clone instead? Run `git pull`, then `node bin/install.mjs --force`. If npx ever serves a stale cached copy, delete the `~/.npm/_npx` folder and run the command again. Or simply tell your agent: "update unofficial-instagram-mcp".
 
 ## Install from source
 
