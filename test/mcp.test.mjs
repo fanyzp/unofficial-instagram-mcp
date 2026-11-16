@@ -24,12 +24,17 @@ send({ jsonrpc: '2.0', id: 4, method: 'tidak/ada' });
 send({ jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'ig_status', arguments: {} } });
 send({ jsonrpc: '2.0', id: 6, method: 'ping' });
 send({ jsonrpc: '2.0', id: 7, method: 'tools/call', params: { name: 'ig_selftest', arguments: { level: 'full' } } });
+send({ jsonrpc: '2.0', id: 8, method: 'tools/call', params: { name: 'dm_watch', arguments: { action: 'status' } } });
+send({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 'dm_events', arguments: {} } });
 
 const init = await waitFor(1);
 assert.equal(init.result.serverInfo.name, 'unofficial-instagram-mcp'); console.log('initialize OK');
+assert.ok(init.result.capabilities.logging, 'capabilities.logging harus diumumkan (kanal notifikasi dm-watch)');
+assert.ok(init.result.instructions.includes('dm_watch'), 'instructions harus menyebut dm_watch');
+console.log('logging capability + watch instructions OK');
 const list = await waitFor(2);
 const names = list.result.tools.map((t) => t.name);
-for (const need of ['ig_status', 'dm_list_threads', 'dm_check', 'dm_read_thread', 'dm_send', 'dm_send_to_user', 'profile_get', 'search', 'post_like', 'post_comment', 'post_reply_to_comment', 'post_create', 'user_posts', 'post_get', 'post_comments', 'feed_home', 'explore_posts', 'hashtag_posts', 'media_urls', 'user_follow', 'user_unfollow', 'followers_list', 'following_list', 'comment_like', 'post_save', 'notifications_list', 'story_view', 'story_reply', 'post_delete', 'stories_tray', 'story_create', 'story_create_poll', 'story_delete', 'ig_selftest'])
+for (const need of ['ig_status', 'dm_list_threads', 'dm_check', 'dm_read_thread', 'dm_send', 'dm_send_to_user', 'dm_watch', 'dm_events', 'profile_get', 'search', 'post_like', 'post_comment', 'post_reply_to_comment', 'post_create', 'user_posts', 'post_get', 'post_comments', 'feed_home', 'explore_posts', 'hashtag_posts', 'media_urls', 'user_follow', 'user_unfollow', 'followers_list', 'following_list', 'comment_like', 'post_save', 'notifications_list', 'story_view', 'story_reply', 'post_delete', 'stories_tray', 'story_create', 'story_create_poll', 'story_delete', 'ig_selftest'])
   assert.ok(names.includes(need), `tool hilang: ${need}`);
 console.log(`tools/list OK (${names.length} tools):`, names.join(', '));
 assert.equal(list.result.tools.find((t) => t.name === 'ig_status').annotations.readOnlyHint, true);
@@ -49,5 +54,15 @@ const stText = stFull.result.content[0].text;
 assert.ok(stText.includes('"refused"'), 'selftest full harus menolak tanpa gerbang');
 assert.ok(stText.includes('akun kedua'), 'penolakan harus memuat peringatan akun kedua');
 console.log('selftest full gate OK:', stText.replace(/\s+/g, ' ').slice(0, 120));
+// Watcher: status + events harus jalan TANPA browser (belum start -> running false, events kosong).
+const watchStatus = await waitFor(8);
+const watchObj = JSON.parse(watchStatus.result.content[0].text);
+assert.equal(watchObj.watcher.running, false);
+console.log('dm_watch status OK:', JSON.stringify(watchObj.watcher).slice(0, 110));
+const ev = await waitFor(9);
+const evObj = JSON.parse(ev.result.content[0].text);
+assert.ok(Array.isArray(evObj.events));
+assert.equal(typeof evObj.cursor, 'number');
+console.log('dm_events OK:', JSON.stringify(evObj).slice(0, 110));
 srv.kill();
 console.log('\nSEMUA TEST MCP LULUS');
