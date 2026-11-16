@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { chromium } from 'playwright-core';
-import { collectUsernamesFromDialog } from '../src/instagram.js';
+import { collectUsernamesFromDialog, extractCommentsFromPage, tagCommentLikeButton } from '../src/instagram.js';
 
 function findShell() {
   const base = path.join(os.homedir(), '.cache', 'ms-playwright');
@@ -94,5 +94,57 @@ for (const f of FIXTURES) {
   console.log(`ok - ${f.name}`);
   passed++;
 }
+// ---- Comment fixtures, mirroring the verified post-page structure ----
+// Right column of stacked blocks (no ul/li): a caption row WITHOUT a Reply
+// leaf (must be skipped), then comment rows with a Like/Unlike button.
+const commentRow = (user, text, likes, extra, btn) => `
+  <div class="row">
+    <a href="/${user}/"><img alt="${user}"></a>
+    <div class="body">
+      <div><a href="/${user}/">${user}</a> <span>2d</span></div>
+      <div>${text}</div>
+      <div><button>${likes} likes</button> <span>Reply</span></div>
+      ${extra}
+    </div>
+    <button aria-label="${btn}"><svg aria-label="${btn}"></svg></button>
+  </div>`;
+await page.setContent(`<!doctype html><html><body><article><div class="col">
+  <div class="row">
+    <a href="/cristiano/"><img alt="cristiano"></a>
+    <div class="body">
+      <div><a href="/cristiano/">cristiano</a> <span>2d</span></div>
+      <div>Back to work</div>
+    </div>
+  </div>
+  ${commentRow('madridtotal__', 'Te amo Cris! 🐐', '6,951', '<div>View all 36 replies</div>', 'Like')}
+  ${commentRow('luxury', 'The GOAT 🐐', '35,796', '<div>See translation</div><div>View all 94 replies</div>', 'Unlike')}
+</div></article></body></html>`);
+const comments = await page.evaluate(extractCommentsFromPage, 10);
+assert.deepStrictEqual(comments, [
+  { username: 'madridtotal__', text: 'Te amo Cris! 🐐' },
+  { username: 'luxury', text: 'The GOAT 🐐' },
+], `comment rows: got ${JSON.stringify(comments)}`);
+console.log('ok - comment rows extracted, caption row skipped');
+passed++;
+const oneComment = await page.evaluate(extractCommentsFromPage, 1);
+assert.strictEqual(oneComment.length, 1, 'comment limit');
+assert.strictEqual(oneComment[0].username, 'madridtotal__');
+console.log('ok - comment limit is respected');
+passed++;
+const likeState = await page.evaluate(tagCommentLikeButton, 'Te amo');
+const taggedLike = await page.evaluate(() => !!document.querySelector('[data-mcp-like-target="like"]'));
+assert.strictEqual(likeState, 'like');
+assert.ok(taggedLike, 'like target tagged');
+console.log('ok - comment like button is tagged');
+passed++;
+const unlikeState = await page.evaluate(tagCommentLikeButton, 'The GOAT');
+assert.strictEqual(unlikeState, 'unlike');
+console.log('ok - already-liked comment reads as unlike');
+passed++;
+const missingState = await page.evaluate(tagCommentLikeButton, 'text that does not exist');
+assert.strictEqual(missingState, null);
+console.log('ok - unknown comment text tags nothing');
+passed++;
+
 await browser.close();
-console.log(`DOM FIXTURE TESTS PASSED (${passed}/${FIXTURES.length})`);
+console.log(`DOM FIXTURE TESTS PASSED (${passed}/${FIXTURES.length + 5})`);
