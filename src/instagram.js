@@ -123,7 +123,21 @@ export async function profileGet({ username } = {}) {
     const counts = [...(header?.querySelectorAll('li, span') || [])]
       .map((e) => e.innerText.trim()).filter((t) => /posts|followers|following|kiriman|pengikut|mengikuti/i.test(t));
     const bio = [...(header?.querySelectorAll('span, div') || [])].map((e) => e.innerText?.trim()).filter(Boolean);
-    return { headerText: text.slice(0, 800), counts, bioLines: [...new Set(bio)].slice(0, 12) };
+    // Cadangan bila header tidak memuat statistik dalam bentuk yang dikenali:
+    // pola "N posts / N followers / N following" di teks halaman, lalu meta og:description.
+    const stats = {};
+    const grab = (src) => {
+      if (!src) return;
+      for (const [key, re] of [['posts', /([\d.,]+\s*[KMkm]?)\s*(?:posts|kiriman)/i], ['followers', /([\d.,]+\s*[KMkm]?)\s*(?:followers|pengikut)/i], ['following', /([\d.,]+\s*[KMkm]?)\s*(?:following|mengikuti)/i]]) {
+        if (stats[key]) continue;
+        const m = src.match(re);
+        if (m) stats[key] = m[1].replace(/\s+/g, '');
+      }
+    };
+    grab(text);
+    grab(document.querySelector('main')?.innerText || '');
+    grab(document.querySelector('meta[property="og:description"]')?.getAttribute('content') || '');
+    return { headerText: text.slice(0, 800), counts, stats, bioLines: [...new Set(bio)].slice(0, 12) };
   }).catch(() => ({}));
   return { username: user, url: page.url(), ...data };
 }
