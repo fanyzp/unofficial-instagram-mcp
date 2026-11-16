@@ -17,6 +17,10 @@ const SKILL_SRC = join(ROOT, 'skills', 'unofficial-instagram-mcp');
 const HOME = homedir();
 const CWD = process.cwd();
 const MCP_ENV = { CDP_URL: 'http://127.0.0.1:9222', IG_DRY_RUN: 'true' };
+// Saat installer jalan lewat npx, path lokal menunjuk ke cache npx yang bisa dibersihkan.
+// Dalam mode itu config ditulis memakai perintah npx agar tetap valid seterusnya.
+const VIA_NPX = ROOT.split(/[\\/]/).includes('_npx');
+const NPX_ARGS = ['-y', 'github:fanyzp/unofficial-instagram-mcp'];
 
 // format: 'mcpServers' (JSON umum) | 'opencode' (JSON key mcp) | 'codex' (TOML) | null (skill saja)
 const HARNESSES = [
@@ -69,17 +73,19 @@ function installMcp(h, scope) {
   if (h.format === 'codex') {
     const cur = existsSync(path) ? readFileSync(path, 'utf8') : '';
     if (cur.includes('[mcp_servers.instagram]')) { log(`  MCP: sudah terdaftar di ${path}, dilewati`); return; }
-    const block = `${cur && !cur.endsWith('\n') ? '\n' : ''}[mcp_servers.instagram]\ncommand = "node"\nargs = ["${SERVER.replace(/\\/g, '\\\\')}"]\n\n[mcp_servers.instagram.env]\nCDP_URL = "${MCP_ENV.CDP_URL}"\nIG_DRY_RUN = "${MCP_ENV.IG_DRY_RUN}"\n`;
+    const cmd = VIA_NPX ? 'npx' : 'node';
+    const argList = (VIA_NPX ? NPX_ARGS : [SERVER]).map((a) => `"${a.replace(/\\/g, '\\\\')}"`).join(', ');
+    const block = `${cur && !cur.endsWith('\n') ? '\n' : ''}[mcp_servers.instagram]\ncommand = "${cmd}"\nargs = [${argList}]\n\n[mcp_servers.instagram.env]\nCDP_URL = "${MCP_ENV.CDP_URL}"\nIG_DRY_RUN = "${MCP_ENV.IG_DRY_RUN}"\n`;
     writeFile(path, cur + block);
     return;
   }
   const cfg = readJson(path);
   if (h.format === 'opencode') {
     cfg.mcp = cfg.mcp || {};
-    cfg.mcp.instagram = { type: 'local', command: ['node', SERVER], enabled: true, environment: MCP_ENV };
+    cfg.mcp.instagram = { type: 'local', command: VIA_NPX ? ['npx', ...NPX_ARGS] : ['node', SERVER], enabled: true, environment: MCP_ENV };
   } else {
     cfg.mcpServers = cfg.mcpServers || {};
-    cfg.mcpServers.instagram = { command: 'node', args: [SERVER], env: MCP_ENV };
+    cfg.mcpServers.instagram = VIA_NPX ? { command: 'npx', args: NPX_ARGS, env: MCP_ENV } : { command: 'node', args: [SERVER], env: MCP_ENV };
   }
   writeFile(path, JSON.stringify(cfg, null, 2) + '\n');
 }
