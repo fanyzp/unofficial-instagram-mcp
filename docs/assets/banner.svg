@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" role="img" aria-label="unofficial-instagram-mcp: Instagram, now accessible to your AI agent.">
+  <rect width="1200" height="360" fill="#101418"/>
+  <g stroke="#232a31" stroke-width="2">
+    <line x1="880" y1="50" x2="990" y2="95"/><line x1="990" y1="95" x2="1105" y2="55"/>
+    <line x1="990" y1="95" x2="960" y2="200"/><line x1="960" y1="200" x2="1060" y2="270"/>
+  </g>
+  <g fill="#333d46"><circle cx="880" cy="50" r="5"/><circle cx="990" cy="95" r="5"/><circle cx="1105" cy="55" r="5"/><circle cx="960" cy="200" r="5"/><circle cx="1060" cy="270" r="5"/></g>
+  <g transform="translate(56 60)">
+  <defs>
+    <linearGradient id="igg" x1="0" y1="240" x2="240" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#feda75"/>
+      <stop offset="0.35" stop-color="#fa7e1e"/>
+      <stop offset="0.6" stop-color="#d62976"/>
+      <stop offset="0.82" stop-color="#962fbf"/>
+      <stop offset="1" stop-color="#4f5bd5"/>
+    </linearGradient>
+  </defs>
+  <g fill="none" stroke="url(#igg)" stroke-width="15">
+    <rect x="22" y="22" width="176" height="176" rx="48"/>
+    <circle cx="110" cy="110" r="46"/>
+  </g>
+  <circle cx="168" cy="52" r="10" fill="url(#igg)"/>
+  <circle cx="182" cy="182" r="47" fill="#15181d" stroke="#ffffff" stroke-width="7"/>
+  <g stroke="#f5f5f2" stroke-width="6" stroke-linecap="round">
+    <line x1="160" y1="170" x2="182" y2="182"/>
+    <line x1="204" y1="170" x2="182" y2="182"/>
+    <line x1="182" y1="182" x2="182" y2="202"/>
+  </g>
+  <circle cx="160" cy="168" r="8" fill="#f5f5f2"/>
+  <circle cx="204" cy="168" r="8" fill="#e1306c"/>
+  <circle cx="182" cy="182" r="9" fill="#f5f5f2"/>
+  <circle cx="182" cy="204" r="7" fill="#f5f5f2"/>
+</g>
+  <text x="340" y="168" font-family="'Segoe UI', Helvetica, Arial, sans-serif" font-size="54" font-weight="700" fill="#f5f5f2">unofficial-instagram-mcp</text>
+  <text x="342" y="222" font-family="'Segoe UI', Helvetica, Arial, sans-serif" font-size="29" fill="#9aa4ae">Instagram, now accessible to your AI agent.</text>
+</svg>
