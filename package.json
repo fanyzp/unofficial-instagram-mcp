@@ -13,7 +13,7 @@
   "scripts": {
     "check": "node --check src/server.js && node --check src/browser.js && node --check src/instagram.js && node --check src/tools.js && node --check src/cli.js && node --check src/tui.js && node --check src/selftest.js && node --check src/run-selftest.js && node --check bin/install.mjs && echo SYNTAX-OK",
     "cli": "node src/cli.js",
-    "start": "node src/server.js",
+    "start": "node bin/run.mjs",
     "test": "node test/mcp.test.mjs",
     "tui": "node src/tui.js",
     "selftest": "node src/run-selftest.js",
@@ -23,6 +23,7 @@
   "version": "0.2.0",
   "author": "fanyzp",
   "bin": {
+    "unofficial-instagram-mcp": "bin/run.mjs",
     "unofficial-instagram-mcp-install": "bin/install.mjs"
   }
 }
