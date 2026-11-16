@@ -80,6 +80,46 @@ export async function dmCheck({ limit = 10 } = {}) {
   return { checked: threads.length, needsReplyCount: needsReply.length, needsReply };
 }
 
+// Snapshot inbox yang MURAH untuk watcher (src/watcher.js): baca DOM daftar
+// thread TANPA klik apa pun, jadi tidak menandai thread terbaca dan jauh
+// lebih ringan dari klik-scan dmListThreads. Hasilnya heuristik (pemicu
+// perubahan), bukan kebenaran final: watcher memverifikasi perubahan dengan
+// dmCheck sebelum membuat event pesan baru.
+export async function dmInboxSnapshot() {
+  const page = await getPage();
+  if (!page.url().includes('/direct/')) await page.goto(S.dm.inboxUrl, { waitUntil: 'domcontentloaded' });
+  await sleep(1800);
+  return page.evaluate((navSel) => {
+    const loginForm = document.querySelector('input[name="username"], form[action*="login"]');
+    const onLoginPage = location.pathname.includes('/accounts/login') || Boolean(loginForm);
+    const a = [...document.querySelectorAll('a')].find((x) => /'s profile picture/.test(x.getAttribute('aria-label') || '') || /profile picture/.test(x.querySelector('img')?.alt || ''));
+    const m = (a?.getAttribute('aria-label') || a?.querySelector('img')?.alt || '').match(/^(.+?)'s profile picture/);
+    const signedInUser = m ? m[1] : null;
+    if (onLoginPage || !signedInUser) return { signedIn: false, signedInUser: null, rows: [] };
+    const rows = []; const seen = new Set();
+    const pushRow = (key, el) => {
+      if (!key || seen.has(key)) return;
+      const lines = (el.innerText || '').split('\n').map((s) => s.trim()).filter(Boolean);
+      if (!lines.length) return;
+      seen.add(key);
+      const bold = [...el.querySelectorAll('*')].some((n) => {
+        const w = getComputedStyle(n).fontWeight;
+        return (w === 'bold' || Number(w) >= 600) && (n.textContent || '').trim().length > 2;
+      });
+      rows.push({ key, name: lines[0] || '', preview: lines[lines.length - 1] || '', unread: bold });
+    };
+    for (const link of document.querySelectorAll('a[href^="/direct/t/"]')) {
+      const mm = (link.getAttribute('href') || '').match(/\/direct\/t\/(\d+)/);
+      if (mm) pushRow(mm[1], link);
+    }
+    if (!rows.length) {
+      const nav = document.querySelector(navSel);
+      if (nav) [...nav.querySelectorAll('button, a, [role="button"]')].forEach((el, i) => pushRow(`row-${i}-${(el.innerText || '').split('\n')[0] || ''}`, el));
+    }
+    return { signedIn: true, signedInUser, rows: rows.slice(0, 30) };
+  }, S.dm.threadListNav).catch(() => ({ signedIn: false, signedInUser: null, rows: [] }));
+}
+
 export async function dmSend({ threadId, text }) {
   const page = await getPage();
   await page.goto(threadUrl(threadId), { waitUntil: 'domcontentloaded' });

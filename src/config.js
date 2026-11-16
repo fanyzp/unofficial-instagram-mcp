@@ -19,6 +19,9 @@ export const env = {
   selftestOnConnect: process.env.IG_SELFTEST_ON_CONNECT === 'true',
   selftestFull: process.env.IG_SELFTEST_FULL === 'true',
   selftestAccount: (process.env.IG_SELFTEST_ACCOUNT || '').replace(/^@/, ''),
+  watchIntervalMs: Number(process.env.IG_WATCH_INTERVAL_MS || 60000),
+  watchOnConnect: process.env.IG_WATCH_ON_CONNECT === 'true',
+  watchLimit: Number(process.env.IG_WATCH_LIMIT || 8),
   selftestTarget: (process.env.IG_SELFTEST_TARGET || 'instagram').replace(/^@/, ''),
   selftestDmTarget: (process.env.IG_SELFTEST_DM_TARGET || '').replace(/^@/, ''),
 };
