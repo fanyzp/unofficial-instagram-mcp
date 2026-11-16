@@ -25,8 +25,20 @@ if (!cmd || cmd === 'tools' || cmd === '--help') {
     for (const t of TOOLS.filter((x) => names.includes(x.name))) console.log(`  ${t.name.padEnd(22)} ${t.description}`);
     console.log('');
   }
+  console.log('watch                 Pantau DM baru terus-menerus; setiap event dicetak 1 baris JSON (Ctrl+C berhenti). Opsi: --intervalSec 60');
+  console.log('');
   console.log('Pakai: node src/cli.js <tool> --argumen nilai');
   process.exit(0);
+}
+if (cmd === 'watch') {
+  const { getWatcher } = await import('./watcher.js');
+  const w = getWatcher((event) => console.log(JSON.stringify(event)));
+  if (args.intervalSec) w.intervalMs = Math.max(15, Number(args.intervalSec)) * 1000;
+  const st = await w.start();
+  console.log(JSON.stringify({ watcher: st }));
+  const keepAlive = setInterval(() => {}, 30000);
+  process.on('SIGINT', () => { w.stop(); clearInterval(keepAlive); process.exit(0); });
+  await new Promise(() => {});
 }
 const tool = findTool(cmd);
 if (!tool) { console.error(`Tool tidak dikenal: ${cmd}`); process.exit(1); }

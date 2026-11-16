@@ -1,5 +1,6 @@
 import * as ig from './instagram.js';
 import { runSelfTest } from './selftest.js';
+import { getWatcher } from './watcher.js';
 
 // Definisi tool MCP + handler-nya. Nama tool = kontrak untuk AI agent.
 // Konvensi agentic: tool BACA diberi readOnlyHint; tool TULIS diberi destructiveHint +
@@ -10,6 +11,7 @@ const str = { type: 'string' };
 const num = { type: 'number' };
 const RO = { readOnlyHint: true, openWorldHint: true };
 const WR = { readOnlyHint: false, destructiveHint: true, openWorldHint: true };
+const CTRL = { readOnlyHint: false, destructiveHint: false, openWorldHint: true };
 
 export const TOOLS = [
   { name: 'ig_status', description: 'Cek koneksi browser & akun Instagram yang sedang login. Panggil ini pertama kali.', inputSchema: S({}), annotations: RO, run: () => ig.status() },
@@ -18,6 +20,8 @@ export const TOOLS = [
   { name: 'dm_read_thread', description: 'Baca isi 1 thread DM: username, nama, dan pesan-pesan terakhir dengan arahnya (fromMe true = pesan akun sendiri).', inputSchema: S({ threadId: str, limit: num }, ['threadId']), annotations: RO, run: (a) => ig.dmReadThread(a) },
   { name: 'dm_send', description: 'Kirim / balas pesan di thread DM yang sudah ada (berdasarkan threadId). AKSI TULIS: benar-benar terkirim kecuali IG_DRY_RUN=true.', inputSchema: S({ threadId: str, text: str }, ['threadId', 'text']), annotations: WR, run: (a) => ig.dmSend(a) },
   { name: 'dm_send_to_user', description: 'Kirim DM ke username tertentu (buka profil, klik Message, lalu kirim). AKSI TULIS seperti dm_send.', inputSchema: S({ username: str, text: str }, ['username', 'text']), annotations: WR, run: (a) => ig.dmSendToUser(a) },
+  { name: 'dm_watch', description: 'Kontrol watcher DM: action "start" mulai memantau inbox di latar belakang (snapshot murah berkala; perubahan diverifikasi dmCheck), "stop" berhenti, "status" (default) laporkan keadaan. Saat pesan baru terverifikasi, server mengirim notifikasi MCP (notifications/message, logger "dm-watch") dan event-nya bisa diambil dengan dm_events. Pesan lama saat start TIDAK dilaporkan (baseline).', inputSchema: S({ action: str, intervalSec: num }), annotations: CTRL, run: async (a) => { const w = getWatcher(); const act = a.action || 'status'; if (act === 'start') { if (a.intervalSec) w.intervalMs = Math.max(15, a.intervalSec) * 1000; return { watcher: await w.start() }; } if (act === 'stop') return { watcher: w.stop() }; return { watcher: w.status() }; } },
+  { name: 'dm_events', description: 'Ambil event watcher DM sejak cursor terakhir: pesan baru terverifikasi (dm_new_message, lengkap dengan threadId, username, teks, dan flag spam) dan perubahan state watcher. Kembalikan cursor dari hasil ini sebagai "since" pada panggilan berikutnya. Baca saja; tidak membuka thread.', inputSchema: S({ since: num, limit: num }), annotations: RO, run: (a) => { const w = getWatcher(); const r = w.eventsSince(a.since || 0, a.limit || 50); return { watcher: w.status(), ...r }; } },
   { name: 'profile_get', description: 'Ambil info profil Instagram (bio, jumlah post/followers/following). Tanpa username = profil akun yang login.', inputSchema: S({ username: str }), annotations: RO, run: (a) => ig.profileGet(a) },
   { name: 'search', description: 'Cari user & hashtag di Instagram dari kata kunci.', inputSchema: S({ query: str, limit: num }, ['query']), annotations: RO, run: (a) => ig.search(a) },
   { name: 'post_like', description: 'Like sebuah post/reel dari URL-nya. Idempotent: kalau sudah di-like, dilaporkan alreadyLiked. AKSI TULIS kecuali IG_DRY_RUN=true.', inputSchema: S({ url: str }, ['url']), annotations: WR, run: (a) => ig.postLike(a) },
@@ -53,7 +57,7 @@ export const TOOLS = [
 // Kategori (prefix) untuk pengelompokan di TUI, CLI, dan docs.
 export const CATEGORIES = [
   ['System', ['ig_status', 'ig_selftest']],
-  ['DM', ['dm_list_threads', 'dm_check', 'dm_read_thread', 'dm_send', 'dm_send_to_user']],
+  ['DM', ['dm_list_threads', 'dm_check', 'dm_read_thread', 'dm_send', 'dm_send_to_user', 'dm_watch', 'dm_events']],
   ['Profile & Search', ['profile_get', 'search']],
   ['Posts', ['post_create', 'post_get', 'post_like', 'post_comment', 'post_reply_to_comment', 'comment_like', 'post_save', 'post_delete', 'user_posts', 'post_comments', 'media_urls']],
   ['Discovery', ['feed_home', 'explore_posts', 'hashtag_posts']],
