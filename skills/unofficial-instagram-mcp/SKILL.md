@@ -50,7 +50,9 @@ user's password. All tools act on the visible web interface via Playwright over 
 System: `ig_status` (connection and account), `ig_selftest` (built-in verification).
 
 DM: `dm_list_threads`, `dm_check` (threads waiting for a reply), `dm_read_thread`,
-`dm_send` (existing thread), `dm_send_to_user` (by username).
+`dm_send` (existing thread), `dm_send_to_user` (by username), `dm_watch`
+(start, stop, or check the inbox watcher), `dm_events` (watcher events since a
+cursor).
 
 Profile and search: `profile_get`, `search` (returns users, hashtags, and media
 shown for the keyword).
@@ -76,6 +78,14 @@ case.
 
 - DM triage: `ig_status` then `dm_check`, then `dm_read_thread` for the thread,
   then `dm_send` with the reply.
+- Auto-reply loop: start the watcher with `dm_watch` (action `start`). The
+  server pushes an MCP notification (`notifications/message`, logger
+  `dm-watch`) when a verified new message arrives; always confirm by pulling
+  `dm_events` with the last cursor, then `dm_read_thread`, then reply with
+  `dm_send`. Messages that existed when the watcher started are a baseline and
+  never produce events. Events carry a `spam` flag for link-only and promo
+  messages; skip those. If your client does not surface notifications, poll
+  `dm_events` on a slow interval instead.
 - Join a post discussion: `post_comments` first, decide, then
   `post_reply_to_comment` with a `match` string from the comment you read.
 - Research: `search` or `hashtag_posts`, then `post_get` and `post_comments`,

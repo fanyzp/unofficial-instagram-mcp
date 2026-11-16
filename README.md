@@ -43,6 +43,7 @@ The server provides the capability layer. The user and the agent decide how to u
 Use it to:
 
 - Read and reply to Instagram direct messages.
+- Get notified automatically when a new direct message arrives: the DM watcher monitors the inbox and pushes an MCP notification, so the agent can react on its own instead of polling.
 - Check profiles, followers, following lists, posts, comments, stories, and notifications.
 - Search users and hashtags, and browse the home feed, Explore page, and hashtag pages.
 - Like posts and comments, reply to a specific comment, save posts, follow or unfollow users, and create posts.
@@ -281,6 +282,8 @@ npm run tui
 | `dm_read_thread` | Read the latest messages in one thread. |
 | `dm_send` | Send a message in an existing thread. |
 | `dm_send_to_user` | Send a message to a user by username. |
+| `dm_watch` | Start, stop, or check the DM watcher that monitors the inbox in the background. |
+| `dm_events` | Read watcher events (verified new messages and watcher state changes) since a cursor. |
 | `notifications_list` | Read recent likes, comments, follows, and mentions. |
 
 ### Profiles and social graph
@@ -331,6 +334,14 @@ Check and answer messages:
 ```text
 ig_status -> dm_check -> dm_read_thread -> dm_send
 ```
+
+React to new messages automatically (auto-reply loop):
+
+```text
+dm_watch (start) -> on notification: dm_events -> dm_read_thread -> dm_send
+```
+
+The watcher takes a cheap inbox snapshot on an interval. When the snapshot changes, it verifies with `dm_check` before emitting an event, so an event means a real new message, not a layout flicker. Messages that already existed when the watcher started are treated as a baseline and are never reported. Each event carries the thread id, username, message text, and a spam flag for link-only and promo messages. Events are pushed as MCP notifications (`notifications/message`, logger `dm-watch`) and can always be pulled again with `dm_events`, which is the reliable path for clients that do not surface notifications. From the CLI, `node src/cli.js watch` streams the same events as JSON lines.
 
 Join a discussion under a post:
 
@@ -387,6 +398,9 @@ The server reads values from the environment and from `.env` in the project root
 | `CDP_URL` | `http://127.0.0.1:9222` | Chrome DevTools Protocol address. |
 | `USER_DATA_DIR` | Empty | Optional persistent browser profile. When set, the server opens that profile instead of connecting over CDP. Sign in manually once. |
 | `IG_DRY_RUN` | `true` | When `true`, write tools simulate the final action. Set to `false` only when you are ready to perform real actions. |
+| `IG_WATCH_INTERVAL_MS` | `60000` | DM watcher snapshot interval in milliseconds (minimum 15000). |
+| `IG_WATCH_ON_CONNECT` | `false` | When `true`, the DM watcher starts automatically when the MCP server connects. |
+| `IG_WATCH_LIMIT` | `8` | How many threads the watcher verifies when the inbox changes. |
 | `MIN_DELAY_MS` | `2500` | Minimum delay between browser actions, in milliseconds. |
 | `MAX_DELAY_MS` | `7000` | Maximum delay between browser actions, in milliseconds. |
 | `IG_SELFTEST_ON_CONNECT` | `false` | When `true`, the safe self-test runs once when the MCP server first connects. |
@@ -425,10 +439,13 @@ src/cli.js          Command line interface
 src/tui.js          Interactive terminal interface (category sub-menus)
 src/selftest.js     Built-in self-test, safe and full levels
 src/run-selftest.js CLI runner for the self-test
+src/watcher.js      DM watcher: inbox snapshots, verification, event queue
 bin/install.mjs     Installer: registers the MCP server and installs the skill per harness
 config/selectors.json
 skills/unofficial-instagram-mcp/SKILL.md   Agent skill that teaches agents this server
 test/mcp.test.mjs   MCP protocol tests that do not need a browser
+test/dom.test.mjs   DOM extraction tests against fixtures
+test/watcher.test.mjs DM watcher rules with injected fakes (no browser)
 test/fixtures/      Image used by the full self-test
 ```
 
@@ -439,7 +456,7 @@ npm run check
 npm test
 ```
 
-The test suite covers the MCP handshake, tool discovery, annotations, server instructions, ping, unknown methods, a tool call made without a browser connection, and the self-test gate that refuses the full level without its safety settings.
+The test suite covers the MCP handshake, tool discovery, annotations, server instructions, ping, unknown methods, a tool call made without a browser connection, the self-test gate that refuses the full level without its safety settings, the DOM extractors against fixtures, and the DM watcher rules (baseline, dedupe, spam flag, signed-out state) with injected fakes.
 
 ## License
 
