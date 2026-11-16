@@ -48,15 +48,27 @@ export async function runSelfTest({ level = 'safe' } = {}) {
   // --- Baca (kedua level) ---
   await step(results, 'profile_get', () => ig.profileGet({ username: me }), (o) => Boolean(o?.headerText || o?.counts));
   await step(results, 'feed_home', () => ig.feedHome({ limit: 3 }));
-  await step(results, 'explore_posts', () => ig.explorePosts({ limit: 3 }), (o) => o.count > 0);
+  const explore = await step(results, 'explore_posts', () => ig.explorePosts({ limit: 3 }), (o) => o.count > 0);
   await step(results, 'hashtag_posts', () => ig.hashtagPosts({ tag: 'photography', limit: 3 }), (o) => o.count > 0);
   await step(results, 'search', () => ig.search({ query: 'instagram', limit: 3 }));
   await step(results, 'stories_tray', () => ig.storiesTray({ limit: 5 }));
   await step(results, 'notifications_list', () => ig.notificationsList({ limit: 5 }));
-  await step(results, 'followers_list', () => ig.followersList({ username: me, limit: 5 }));
-  await step(results, 'following_list', () => ig.followingList({ username: me, limit: 5 }));
+  await step(results, 'followers_list', () => ig.followersList({ username: me, limit: 5 }), (o) => o?.dialogOpened === true);
+  await step(results, 'following_list', () => ig.followingList({ username: me, limit: 5 }), (o) => o?.dialogOpened === true);
+  // Probe akun publik besar: menangkap regresi pengambilan baris dialog
+  // (akun sendiri bisa saja lolos sementara struktur baris berubah).
+  await step(results, 'followers_list (public probe)', () => ig.followersList({ username: 'instagram', limit: 5 }), (o) => o?.count > 0);
   await step(results, 'user_posts', () => ig.userPosts({ username: me, limit: 3 }));
   await step(results, 'dm_check', () => ig.dmCheck({ limit: 3 }));
+  // post_comments dan media_urls ikut level safe memakai post explore pertama.
+  const probeUrl = explore?.posts?.[0]?.url;
+  if (probeUrl) {
+    await step(results, 'post_comments', () => ig.postComments({ url: probeUrl, limit: 3 }));
+    await step(results, 'media_urls', () => ig.mediaUrls({ url: probeUrl }), (o) => o.count > 0);
+  } else {
+    results.push({ tool: 'post_comments', ok: true, detail: 'Dilewati: tidak ada post dari explore untuk probe.' });
+    results.push({ tool: 'media_urls', ok: true, detail: 'Dilewati: tidak ada post dari explore untuk probe.' });
+  }
 
   if (level !== 'full') {
     const passed = results.filter((r) => r.ok).length;

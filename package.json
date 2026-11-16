@@ -14,7 +14,7 @@
     "check": "node --check src/server.js && node --check src/browser.js && node --check src/instagram.js && node --check src/tools.js && node --check src/cli.js && node --check src/tui.js && node --check src/selftest.js && node --check src/run-selftest.js && node --check bin/install.mjs && echo SYNTAX-OK",
     "cli": "node src/cli.js",
     "start": "node bin/run.mjs",
-    "test": "node test/mcp.test.mjs",
+    "test": "node test/mcp.test.mjs && node test/dom.test.mjs",
     "tui": "node src/tui.js",
     "selftest": "node src/run-selftest.js",
     "install:agent": "node bin/install.mjs"
