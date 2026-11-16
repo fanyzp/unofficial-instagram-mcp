@@ -2,11 +2,26 @@
 // Official installer for unofficial-instagram-mcp: installs the MCP server and
 // the Agent Skill into the agent harnesses (clients) the user picks, in one flow.
 //   node bin/install.mjs                      -> interactive (arrow key pickers)
-//   node bin/install.mjs --harness claude-code,opencode --scope user --yes
+//   node bin/install.mjs --harness claude-code,opencode --scope user
 //   node bin/install.mjs --all --scope project --dry-run
 // No dependencies. Existing config files are merged, never replaced wholesale.
+//
+// Harness config formats, checked against each project's documentation:
+//   mcpServers  Claude Code, Cursor, Gemini CLI, Pi, Oh My Pi, Windsurf,
+//               Claude Desktop, VS Code (Copilot layout, VS Code 1.146+)
+//   opencode    OpenCode JSON "mcp" with { type: "local", command: [..] }
+//   codex       Codex TOML [mcp_servers.instagram]
+//   nested      OpenClaw and ZCode: JSON under mcp.servers
+//   amp         Amp settings.json under the literal key "amp.mcpServers"
+//   zed         Zed "context_servers" with a nested command object
+//   goose       Goose config.yaml "extensions" (YAML, edited conservatively)
+// OpenClaw (JSON5), Amp and Zed (JSONC) config files may contain comments:
+// if such a file does not parse as strict JSON, the installer prints the
+// entry to paste by hand instead of rewriting the file without its comments.
+// T3 Code has no MCP config of its own: it runs other providers (Claude
+// Code, Codex) and reads their configs, so install into one of those.
 import { existsSync, mkdirSync, readFileSync, writeFileSync, cpSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { homedir, platform } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline/promises';
@@ -23,7 +38,9 @@ const MCP_ENV = { CDP_URL: 'http://127.0.0.1:9222', IG_DRY_RUN: 'true' };
 const VIA_NPX = ROOT.split(/[\\/]/).includes('_npx');
 const NPX_ARGS = ['-y', 'github:fanyzp/unofficial-instagram-mcp'];
 
-// format: 'mcpServers' (generic JSON) | 'opencode' (JSON with mcp key) | 'codex' (TOML) | null (skill only)
+const osPick = ({ darwin, win32, linux }) => (platform() === 'darwin' ? darwin : platform() === 'win32' ? win32 : linux);
+
+// mcp / skill are null where a harness has no such install target.
 const HARNESSES = [
   { id: 'claude-code', label: 'Claude Code', format: 'mcpServers',
     mcp: { user: join(HOME, '.claude.json'), project: join(CWD, '.mcp.json') },
@@ -40,6 +57,52 @@ const HARNESSES = [
   { id: 'gemini-cli', label: 'Gemini CLI', format: 'mcpServers',
     mcp: { user: join(HOME, '.gemini', 'settings.json'), project: join(CWD, '.gemini', 'settings.json') },
     skill: { user: join(HOME, '.gemini', 'skills'), project: join(CWD, '.gemini', 'skills') } },
+  { id: 'pi', label: 'Pi', format: 'mcpServers',
+    mcp: { user: join(HOME, '.pi', 'agent', 'mcp.json'), project: join(CWD, '.pi', 'mcp.json') },
+    skill: { user: join(HOME, '.pi', 'agent', 'skills'), project: join(CWD, '.pi', 'skills') } },
+  { id: 'oh-my-pi', label: 'Oh My Pi (omp)', format: 'mcpServers',
+    mcp: { user: join(HOME, '.omp', 'agent', 'mcp.json'), project: join(CWD, '.omp', 'mcp.json') },
+    skill: { user: join(HOME, '.omp', 'agent', 'skills'), project: join(CWD, '.omp', 'skills') } },
+  { id: 'openclaw', label: 'OpenClaw', format: 'nested', loose: true,
+    mcp: { user: join(HOME, '.openclaw', 'openclaw.json'), project: null },
+    mcpNote: 'OpenClaw uses one gateway config, so there is no project-scope MCP file.',
+    skill: { user: join(HOME, '.openclaw', 'skills'), project: join(CWD, 'skills') } },
+  { id: 'zcode', label: 'ZCode', format: 'nested',
+    mcp: { user: join(HOME, '.zcode', 'cli', 'config.json'), project: join(CWD, '.zcode', 'config.json') },
+    skill: null, skillNote: 'ZCode ships skills as plugins, so only the MCP server is installed.' },
+  { id: 'goose', label: 'Goose', format: 'goose',
+    mcp: { user: osPick({
+      darwin: join(HOME, '.config', 'goose', 'config.yaml'),
+      win32: join(HOME, 'AppData', 'Roaming', 'Block', 'goose', 'config', 'config.yaml'),
+      linux: join(HOME, '.config', 'goose', 'config.yaml'),
+    }), project: null },
+    mcpNote: 'Goose keeps extensions in its user config, so there is no project-scope MCP file.',
+    skill: { user: join(HOME, '.agents', 'skills'), project: join(CWD, '.agents', 'skills') } },
+  { id: 'amp', label: 'Amp', format: 'amp', loose: true,
+    mcp: { user: join(HOME, '.config', 'amp', 'settings.json'), project: join(CWD, '.amp', 'settings.json') },
+    skill: { user: join(HOME, '.config', 'amp', 'skills'), project: join(CWD, '.agents', 'skills') } },
+  { id: 'vscode', label: 'VS Code (Copilot)', format: 'mcpServers',
+    mcp: { user: join(HOME, '.copilot', 'mcp-config.json'), project: join(CWD, '.mcp.json') },
+    skill: { user: join(HOME, '.copilot', 'skills'), project: join(CWD, '.github', 'skills') } },
+  { id: 'claude-desktop', label: 'Claude Desktop', format: 'mcpServers',
+    mcp: { user: osPick({
+      darwin: join(HOME, 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json'),
+      win32: join(HOME, 'AppData', 'Roaming', 'Claude', 'claude_desktop_config.json'),
+      linux: join(HOME, '.config', 'Claude', 'claude_desktop_config.json'),
+    }), project: null },
+    mcpNote: 'Claude Desktop has no project scope.',
+    skill: null, skillNote: 'Claude Desktop does not load SKILL.md folders from disk, so only the MCP server is installed.' },
+  { id: 'windsurf', label: 'Windsurf', format: 'mcpServers',
+    mcp: { user: join(HOME, '.codeium', 'windsurf', 'mcp_config.json'), project: null },
+    mcpNote: 'Windsurf (Cascade) uses one global MCP file for every workspace.',
+    skill: null, skillNote: 'Windsurf does not load SKILL.md skill folders, so only the MCP server is installed.' },
+  { id: 'zed', label: 'Zed', format: 'zed', loose: true,
+    mcp: { user: osPick({
+      darwin: join(HOME, '.config', 'zed', 'settings.json'),
+      win32: join(HOME, 'AppData', 'Roaming', 'Zed', 'settings.json'),
+      linux: join(HOME, '.config', 'zed', 'settings.json'),
+    }), project: join(CWD, '.zed', 'settings.json') },
+    skill: null, skillNote: 'Zed does not load SKILL.md skill folders, so only the MCP server is installed.' },
   { id: 'generic', label: 'Generic (.agents/skills, skill only)', format: null,
     mcp: null,
     skill: { user: join(HOME, '.agents', 'skills'), project: join(CWD, '.agents', 'skills') } },
@@ -53,13 +116,22 @@ const log = (s) => console.log(s);
 const plan = (s) => log(dryRun ? `[dry-run] ${s}` : s);
 
 if (flag('list')) {
-  for (const h of HARNESSES) log(`${h.id.padEnd(12)} ${h.label}`);
+  for (const h of HARNESSES) log(`${h.id.padEnd(16)} ${h.label}`);
   process.exit(0);
 }
 
 function readJson(path) {
   if (!existsSync(path)) return {};
   try { return JSON.parse(readFileSync(path, 'utf8')); } catch { throw new Error(`Config file is not valid JSON: ${path}`); }
+}
+// For JSON5/JSONC files (loose harnesses): returns null when the file has
+// content that strict JSON cannot parse, so the caller prints the entry
+// instead of rewriting the file and dropping its comments.
+function readJsonLoose(path) {
+  if (!existsSync(path)) return {};
+  const text = readFileSync(path, 'utf8');
+  if (!text.trim()) return {};
+  try { return JSON.parse(text); } catch { return null; }
 }
 function writeFile(path, content) {
   if (dryRun) { plan(`write ${path}`); return; }
@@ -68,30 +140,111 @@ function writeFile(path, content) {
   log(`  written: ${path}`);
 }
 
+const cmdAndArgs = () => (VIA_NPX ? { command: 'npx', args: NPX_ARGS } : { command: 'node', args: [SERVER] });
+
+function entryFor(format) {
+  const { command, args: cmdArgs } = cmdAndArgs();
+  if (format === 'opencode') return { type: 'local', command: [command, ...cmdArgs], enabled: true, environment: MCP_ENV };
+  if (format === 'zed') return { source: 'custom', command: { path: command, args: cmdArgs, env: MCP_ENV } };
+  return { command, args: cmdArgs, env: MCP_ENV };
+}
+
+function snippetFor(h) {
+  if (h.format === 'codex') {
+    const { command, args: cmdArgs } = cmdAndArgs();
+    const argList = cmdArgs.map((a) => `"${a.replace(/\\/g, '\\\\')}"`).join(', ');
+    return `[mcp_servers.instagram]\ncommand = "${command}"\nargs = [${argList}]\n\n[mcp_servers.instagram.env]\nCDP_URL = "${MCP_ENV.CDP_URL}"\nIG_DRY_RUN = "${MCP_ENV.IG_DRY_RUN}"`;
+  }
+  if (h.format === 'goose') return `extensions:\n${gooseBlock()}`;
+  const entry = entryFor(h.format);
+  if (h.format === 'nested') return JSON.stringify({ mcp: { servers: { instagram: entry } } }, null, 2);
+  if (h.format === 'amp') return JSON.stringify({ 'amp.mcpServers': { instagram: entry } }, null, 2);
+  if (h.format === 'zed') return JSON.stringify({ context_servers: { instagram: entry } }, null, 2);
+  if (h.format === 'opencode') return JSON.stringify({ mcp: { instagram: entry } }, null, 2);
+  return JSON.stringify({ mcpServers: { instagram: entry } }, null, 2);
+}
+
+function printManual(h, path, why) {
+  log(`  MCP: ${path} ${why}; nothing was changed. Add this entry by hand:`);
+  for (const line of snippetFor(h).split('\n')) log(`    ${line}`);
+}
+
+function gooseBlock() {
+  const { command, args: cmdArgs } = cmdAndArgs();
+  const q = (s) => `"${String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+  return [
+    '  instagram:',
+    '    enabled: true',
+    '    type: stdio',
+    '    name: instagram',
+    `    cmd: ${command}`,
+    `    args: [${cmdArgs.map(q).join(', ')}]`,
+    '    envs:',
+    ...Object.entries(MCP_ENV).map(([k, v]) => `      ${k}: ${q(v)}`),
+    '    timeout: 300',
+  ].join('\n');
+}
+
+function installGoose(h, path) {
+  if (!existsSync(path)) {
+    writeFile(path, `extensions:\n${gooseBlock()}\n`);
+    return;
+  }
+  const text = readFileSync(path, 'utf8');
+  if (/^\s*instagram\s*:/m.test(text)) { log(`  MCP: already registered in ${path}, skipped`); return; }
+  if (/^extensions\s*:\s*\{/m.test(text)) { printManual(h, path, 'uses a flow-style extensions map'); return; }
+  if (/^extensions\s*:\s*$/m.test(text)) {
+    writeFile(path, text.replace(/^extensions\s*:\s*$/m, (m) => `${m}\n${gooseBlock()}`));
+    return;
+  }
+  if (/^extensions\s*:/m.test(text)) { printManual(h, path, 'has an extensions section in a shape the installer will not rewrite'); return; }
+  writeFile(path, `${text.replace(/\s*$/, '')}\n\nextensions:\n${gooseBlock()}\n`);
+}
+
 function installMcp(h, scope) {
   if (!h.mcp) { log('  MCP: skipped (this harness is skill only; register the server manually, see the README)'); return; }
   const path = h.mcp[scope];
+  if (!path) {
+    log(`  MCP: skipped for ${scope} scope. ${h.mcpNote || ''}`);
+    return;
+  }
+  if (h.format === 'goose') { installGoose(h, path); return; }
   if (h.format === 'codex') {
     const cur = existsSync(path) ? readFileSync(path, 'utf8') : '';
     if (cur.includes('[mcp_servers.instagram]')) { log(`  MCP: already registered in ${path}, skipped`); return; }
-    const cmd = VIA_NPX ? 'npx' : 'node';
-    const argList = (VIA_NPX ? NPX_ARGS : [SERVER]).map((a) => `"${a.replace(/\\/g, '\\\\')}"`).join(', ');
-    const block = `${cur && !cur.endsWith('\n') ? '\n' : ''}[mcp_servers.instagram]\ncommand = "${cmd}"\nargs = [${argList}]\n\n[mcp_servers.instagram.env]\nCDP_URL = "${MCP_ENV.CDP_URL}"\nIG_DRY_RUN = "${MCP_ENV.IG_DRY_RUN}"\n`;
-    writeFile(path, cur + block);
+    writeFile(path, cur + (cur && !cur.endsWith('\n') ? '\n' : '') + snippetFor(h) + '\n');
     return;
   }
-  const cfg = readJson(path);
+  const cfg = h.loose ? readJsonLoose(path) : readJson(path);
+  if (cfg === null) { printManual(h, path, 'is not strict JSON (it may contain comments)'); return; }
+  const entry = entryFor(h.format);
   if (h.format === 'opencode') {
     cfg.mcp = cfg.mcp || {};
-    cfg.mcp.instagram = { type: 'local', command: VIA_NPX ? ['npx', ...NPX_ARGS] : ['node', SERVER], enabled: true, environment: MCP_ENV };
+    if (cfg.mcp.instagram && !flag('force')) { log(`  MCP: already registered in ${path}, skipped`); return; }
+    cfg.mcp.instagram = entry;
+  } else if (h.format === 'nested') {
+    cfg.mcp = cfg.mcp || {};
+    cfg.mcp.servers = cfg.mcp.servers || {};
+    if (cfg.mcp.servers.instagram && !flag('force')) { log(`  MCP: already registered in ${path}, skipped`); return; }
+    cfg.mcp.servers.instagram = entry;
+  } else if (h.format === 'amp') {
+    cfg['amp.mcpServers'] = cfg['amp.mcpServers'] || {};
+    if (cfg['amp.mcpServers'].instagram && !flag('force')) { log(`  MCP: already registered in ${path}, skipped`); return; }
+    cfg['amp.mcpServers'].instagram = entry;
+  } else if (h.format === 'zed') {
+    cfg.context_servers = cfg.context_servers || {};
+    if (cfg.context_servers.instagram && !flag('force')) { log(`  MCP: already registered in ${path}, skipped`); return; }
+    cfg.context_servers.instagram = entry;
   } else {
     cfg.mcpServers = cfg.mcpServers || {};
-    cfg.mcpServers.instagram = VIA_NPX ? { command: 'npx', args: NPX_ARGS, env: MCP_ENV } : { command: 'node', args: [SERVER], env: MCP_ENV };
+    if (cfg.mcpServers.instagram && !flag('force')) { log(`  MCP: already registered in ${path}, skipped`); return; }
+    cfg.mcpServers.instagram = entry;
   }
   writeFile(path, JSON.stringify(cfg, null, 2) + '\n');
 }
 
 function installSkill(h, scope) {
+  if (!h.skill) { log(`  Skill: skipped. ${h.skillNote || ''}`); return; }
   const dest = join(h.skill[scope], 'unofficial-instagram-mcp');
   if (existsSync(dest) && !flag('force')) { log(`  Skill: already present at ${dest}, skipped (use --force to overwrite)`); return; }
   if (dryRun) { plan(`copy skill -> ${dest}`); return; }
