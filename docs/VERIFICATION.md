@@ -71,6 +71,24 @@ The 3 story tools remain blocked by Instagram Web itself, as recorded above.
 
 **Summary:** 31 of 34 tools pass live. The 3 blocked tools share one cause, described below.
 
+## DM watcher (v0.3.0, 16 November 2026)
+
+Two tools were added after the sweep above: `dm_watch` and `dm_events`. Their verification status:
+
+| Tool | Result |
+| --- | --- |
+| `dm_watch` | Pass (protocol and live browser state) |
+| `dm_events` | Pass (protocol and live browser state) |
+
+What was verified, and at which level:
+
+- Unit level: `test/watcher.test.mjs` injects fake snapshot and verify functions and proves the watcher rules: the baseline never reports old messages, a verified new message produces exactly one event, repeated polls do not duplicate it, the spam flag is set on link-only and promo messages, the cursor in `dm_events` advances correctly, and the signed-out state is reported once.
+- Protocol level: the MCP suite covers tool discovery for all 36 tools, the `logging` capability announced at initialize, and `dm_watch` status plus `dm_events` calls without a browser.
+- Live browser level: a real MCP client started the watcher against a Chrome window showing the real Instagram login page (the VM browser was signed out). The watcher reported state `signed_out`, pushed one `notifications/message` notification (logger `dm-watch`) to the client, and `dm_events` returned the same event.
+- Full loop, simulated arrival: with the page layer injected, a new DM produced the `dm_new_message` event, the exact notification envelope the server sends, and the `dm_events` pull.
+
+Not yet verified live: a real DM arriving into a signed-in browser watched by this server. That last step needs a Chrome window signed in to the second account with remote debugging on, then one incoming message while `dm_watch` is running.
+
 ## Platform limitation: story creation on the web
 
 Instagram Web offered no story creation entry point for the test account: no "Your story" button in the stories tray, the Create menu only starts a post, and the profile avatar only changes the profile photo. Because no story could be created on the web, `story_create` and `story_create_poll` could not be exercised, and `story_delete` had no web-created story to delete.
@@ -83,4 +101,4 @@ The tools detect this and report it clearly instead of failing silently. Story c
 - The hashtag page URL redirects to the keyword search page; the post grid still loads and `hashtag_posts` collects it normally.
 - On a private account, a re-follow ends in the `Requested` state until the owner approves it. `user_follow` reports that state as it is. In this run the owner approved the request and the end state matched the starting state (`Following`).
 - A second round on the same day re-verified `search`, `user_posts`, `profile_get`, and `post_get` after fixes prompted by real agent use: search now goes through the nav search panel and returns account rows with avatars, profile grids return their full post list (12 unique posts sampled), profile stats read from the header, and a post's author is read from the article header, so a tagged account that appears earlier in the article is no longer mistaken for the author.
-- The local protocol test suite (`npm test`) passes in full: handshake, tool discovery for all 34 tools, annotations, server instructions, ping, unknown methods, graceful error without a browser, and the self-test gate that refuses the full level without its safety settings.
+- The local protocol test suite (`npm test`) passes in full: handshake, tool discovery for all 36 tools, annotations, server instructions, ping, unknown methods, graceful error without a browser, the self-test gate that refuses the full level without its safety settings, the DOM extractors against fixtures, and the DM watcher rules.

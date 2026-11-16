@@ -421,7 +421,7 @@ The server reads values from the environment and from `.env` in the project root
 
 ## Verification status
 
-Every tool was live tested on a second account on 16 November 2026: **31 of 34 tools pass**. The 3 remaining tools (`story_create`, `story_create_poll`, `story_delete`) are blocked by an Instagram Web platform limitation, not by this code.
+The original 34 tools were live tested on a second account on 16 November 2026: **31 of 34 pass**. The 3 remaining tools (`story_create`, `story_create_poll`, `story_delete`) are blocked by an Instagram Web platform limitation, not by this code. The two watcher tools added in v0.3.0 (`dm_watch`, `dm_events`) are verified at unit, protocol, and live-browser state level; the one step still open is a real DM arriving into a signed-in watched browser, as recorded in [docs/VERIFICATION.md](docs/VERIFICATION.md).
 
 Full per-tool results, the test environment, and the run notes live in [docs/VERIFICATION.md](docs/VERIFICATION.md).
 
