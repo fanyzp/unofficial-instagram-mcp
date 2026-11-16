@@ -17,6 +17,7 @@ user's password. All tools act on the visible web interface via Playwright over 
 ## Setup, if the server is not connected yet
 
 1. Fastest path: run `npx github:fanyzp/unofficial-instagram-mcp install --harness <your-harness-id> --scope user --yes`.
+   Harness ids: claude-code, opencode, cursor, codex, gemini-cli, pi, oh-my-pi, openclaw, zcode, goose, amp, vscode, claude-desktop, windsurf, zed, generic. T3 Code reads the Claude Code or Codex config, so use one of those ids for it.
    To update an existing install later, run `npx github:fanyzp/unofficial-instagram-mcp update`.
    It registers the server and installs this skill in one run. Keep `IG_DRY_RUN=true`.
    Manual alternative: register the server with command `npx` and args

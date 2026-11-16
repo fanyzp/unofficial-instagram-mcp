@@ -123,7 +123,8 @@ Set up unofficial-instagram-mcp for me and learn how it works before using it.
 1. Read the Agent Skill first: https://github.com/fanyzp/unofficial-instagram-mcp/blob/main/skills/unofficial-instagram-mcp/SKILL.md
    It explains how the server works, the tool map, the workflows, and the safety rules. Follow it from now on.
 2. Run the installer for your own harness: npx github:fanyzp/unofficial-instagram-mcp install --harness <your-harness-id> --scope user --yes
-   Harness ids: claude-code, opencode, cursor, codex, gemini-cli, generic.
+   Harness ids: claude-code, opencode, cursor, codex, gemini-cli, pi, oh-my-pi, openclaw, zcode, goose, amp, vscode, claude-desktop, windsurf, zed, generic.
+   T3 Code has no MCP config of its own: it runs other providers and reads their configs, so use claude-code or codex for it.
    If your harness is not listed, register the server manually with command "npx" and args ["-y", "github:fanyzp/unofficial-instagram-mcp"], env CDP_URL=http://127.0.0.1:9222 and IG_DRY_RUN=true, and copy the skills/unofficial-instagram-mcp folder into your agent skills directory, keeping the folder name unchanged.
 3. Start Chrome with remote debugging on port 9222 if it is not running yet. I will sign in to Instagram manually. Do not ask for or store my password.
 4. Call ig_status first and confirm the signed-in username with me.
@@ -217,7 +218,7 @@ Add `-g` for a user-wide install, or pin targets directly, for example `npx skil
 node bin/install.mjs
 ```
 
-It asks for the scope (user or this project) and the harness (Claude Code, OpenCode, Cursor, Codex, Gemini CLI, or a generic `.agents/skills` target), registers the `instagram` MCP server in that harness's config, and copies the skill into its skills directory. Existing config files are merged, not replaced. Non-interactive form:
+It asks for the scope (user or this project) and the harness (16 targets: Claude Code, OpenCode, Cursor, Codex, Gemini CLI, Pi, Oh My Pi, OpenClaw, ZCode, Goose, Amp, VS Code, Claude Desktop, Windsurf, Zed, or a generic `.agents/skills` target; run it with `--list` for the ids), registers the `instagram` MCP server in that harness's own config format, and copies the skill into its skills directory where the harness supports skill folders. Existing config files are merged, not replaced. Non-interactive form:
 
 ```bash
 node bin/install.mjs --harness claude-code,opencode --scope user --yes
