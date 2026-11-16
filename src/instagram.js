@@ -239,11 +239,19 @@ export async function postComment({ url, text }) {  const page = await getPage()
 async function collectPostLinks(page, limit) {
   return page.evaluate((lim) => {
     const out = []; const seen = new Set();
-    for (const a of document.querySelectorAll('a[href^="/p/"], a[href^="/reel/"], a[href^="/reels/"]')) {
+    // IG kini merender link postingan profil sebagai /<username>/p/<code>/ dan
+    // /<username>/reel/<code>/, bukan /p/<code>/ polos. Cocokkan pola kodenya di
+    // posisi mana pun pada path, lalu bangun URL kanoniknya.
+    for (const a of document.querySelectorAll('a[href]')) {
       const href = a.getAttribute('href');
-      if (!href || seen.has(href)) continue;
-      seen.add(href);
-      out.push({ url: 'https://www.instagram.com' + href, type: href.includes('reel') ? 'reel' : 'post' });
+      if (!href) continue;
+      const m = href.match(/\/(p|reel|reels)\/([A-Za-z0-9_-]+)/);
+      if (!m) continue;
+      const kind = m[1] === 'p' ? 'p' : 'reel';
+      const key = `${kind}/${m[2]}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ url: `https://www.instagram.com/${kind}/${m[2]}/`, type: kind === 'p' ? 'post' : 'reel' });
       if (out.length >= lim) break;
     }
     return out;
@@ -265,12 +273,24 @@ export async function postGet({ url }) {
   const data = await page.evaluate(() => {
     const art = document.querySelector('article') || document.querySelector('main');
     const text = (art?.innerText || '').trim();
-    const author = art?.querySelector('a[href^="/"]')?.getAttribute('href')?.replace(/\//g, '') || '';
+    // Penulis = link profil di HEADER artikel. Link profil pertama di seluruh
+    // artikel bisa milik akun yang di-tag / disarankan, bukan penulisnya.
+    const segOf = (a) => (a?.getAttribute('href') || '').split('/').filter(Boolean);
+    let author = '';
+    const headerLink = art?.querySelector('header a[href^="/"]');
+    if (headerLink && segOf(headerLink).length === 1) author = segOf(headerLink)[0];
+    if (!author) {
+      const single = [...(art?.querySelectorAll('a[href^="/"]') || [])].find((a) => segOf(a).length === 1);
+      if (single) author = segOf(single)[0];
+    }
     const time = art?.querySelector('time')?.getAttribute('datetime') || '';
     const media = [...(art?.querySelectorAll('img, video') || [])].map((m) => m.tagName === 'VIDEO' ? 'video' : 'image');
     return { author, time, mediaTypes: [...new Set(media)], pageText: text.slice(0, 1500) };
   }).catch(() => ({}));
-  return { url, ...data };
+  // URL berbentuk /<username>/p/<code>/ menyebut penulisnya secara eksplisit.
+  const urlUser = new URL(page.url()).pathname.split('/').filter(Boolean);
+  const fromUrl = urlUser.length >= 3 && (urlUser[1] === 'p' || urlUser[1] === 'reel') ? urlUser[0] : '';
+  return { url, ...data, author: fromUrl || data.author || '' };
 }
 
 export async function postComments({ url, limit = 20 }) {
@@ -297,9 +317,17 @@ export async function feedHome({ limit = 10 } = {}) {
   const posts = await page.evaluate((lim) => {
     const out = [];
     for (const art of document.querySelectorAll('article')) {
-      const a = art.querySelector('a[href^="/p/"], a[href^="/reel/"]');
-      const author = art.querySelector('a[href^="/"]')?.getAttribute('href')?.replace(/\//g, '') || '';
-      out.push({ author, url: a ? 'https://www.instagram.com' + a.getAttribute('href') : null, snippet: (art.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 220) });
+      // Link postingan bisa berbentuk /<username>/p/<code>/; cocokkan pola kodenya.
+      let url = null;
+      for (const a of art.querySelectorAll('a[href]')) {
+        const m = (a.getAttribute('href') || '').match(/\/(p|reel|reels)\/([A-Za-z0-9_-]+)/);
+        if (m) { url = `https://www.instagram.com/${m[1] === 'p' ? 'p' : 'reel'}/${m[2]}/`; break; }
+      }
+      // Penulis dari header artikel, bukan link profil pertama sembarangan.
+      const segOf = (a) => (a?.getAttribute('href') || '').split('/').filter(Boolean);
+      const headerLink = art.querySelector('header a[href^="/"]');
+      const author = headerLink && segOf(headerLink).length === 1 ? segOf(headerLink)[0] : '';
+      out.push({ author, url, snippet: (art.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 220) });
       if (out.length >= lim) break;
     }
     return out;
@@ -426,7 +454,13 @@ export async function postDelete({ url }) {
   const me = (await status()).signedInUser;
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await sleep(2500); await dismissDialogs(page);
-  const author = await page.evaluate(() => document.querySelector('article a[href^="/"]')?.getAttribute('href')?.replace(/\//g, '') || '').catch(() => '');
+  const author = await page.evaluate(() => {
+    const segOf = (a) => (a?.getAttribute('href') || '').split('/').filter(Boolean);
+    const headerLink = document.querySelector('article header a[href^="/"]');
+    if (headerLink && segOf(headerLink).length === 1) return segOf(headerLink)[0];
+    const seg = location.pathname.split('/').filter(Boolean);
+    return seg.length >= 3 && (seg[1] === 'p' || seg[1] === 'reel') ? seg[0] : '';
+  }).catch(() => '');
   if (me && author && author !== me) return { deleted: false, reason: `Post ini milik @${author}, bukan akun login @${me}. post_delete hanya untuk post sendiri.`, url };
   const more = page.locator('svg[aria-label="More options"], svg[aria-label="More Options"]').first();
   if (!(await more.isVisible().catch(() => false))) return { deleted: false, reason: 'Tombol opsi (titik tiga) tidak ditemukan di post ini.', url };
