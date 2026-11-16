@@ -131,28 +131,60 @@ export async function profileGet({ username } = {}) {
 // ---------- SEARCH ----------
 export async function search({ query, limit = 15 }) {
   const page = await getPage();
+  await page.goto('https://www.instagram.com/', { waitUntil: 'domcontentloaded' });
+  await sleep(2500); await dismissDialogs(page);
+  // Pencarian akun yang sebenarnya ada di PANEL Search pada nav: mengetik di sana
+  // menampilkan baris akun + hashtag. URL keyword hanya memberi grid media, jadi
+  // panel ini jalur utama; grid keyword hanya cadangan bila panel tidak terbuka.
+  let results = [];
+  try {
+    const icon = page.locator('svg[aria-label="Search" i], svg[aria-label="Cari" i]').first();
+    await icon.click({ timeout: 5000 });
+    await sleep(1200);
+    const input = page.locator('input[placeholder*="Search" i], input[placeholder*="Cari" i]').first();
+    await input.click({ timeout: 5000 });
+    await input.pressSequentially(query, { delay: 60 });
+    await sleep(2800);
+    results = await page.evaluate((lim) => {
+      const out = []; const seen = new Set();
+      for (const a of document.querySelectorAll('a[href^="/"]')) {
+        const href = a.getAttribute('href');
+        if (!href || seen.has(href)) continue;
+        const seg = href.split('/').filter(Boolean);
+        const label = (a.innerText || '').replace(/\s*\n\s*/g, ' | ').trim().slice(0, 140);
+        if (seg.length === 1 && !['explore', 'direct', 'reels', 'accounts', 'stories'].includes(seg[0])) {
+          // Baris akun punya avatar; lewati link nav polos tanpa gambar.
+          if (!a.querySelector('img')) continue;
+          seen.add(href); out.push({ type: 'user', username: seg[0], url: 'https://www.instagram.com' + href, label });
+        } else if (href.includes('/explore/search/keyword/') || (seg[0] === 'explore' && seg[1] === 'tags')) {
+          seen.add(href); out.push({ type: 'hashtag', url: 'https://www.instagram.com' + href, label });
+        }
+        if (out.length >= lim) break;
+      }
+      return out;
+    }, limit);
+  } catch { results = []; }
+  if (results.length) return { query, count: results.length, results, source: 'search-panel' };
+  // Cadangan: halaman keyword (grid media bertema query).
   await page.goto(S.search.url + encodeURIComponent(query), { waitUntil: 'domcontentloaded' });
   await sleep(3000); await dismissDialogs(page);
-  // TERVERIFIKASI live 16 Nov: URL keyword ini merender GRID MEDIA (foto/reel bertema query),
-  // BUKAN daftar akun/hashtag. Jadi hasil = campuran link user/hashtag (bila ada) + post grid.
-  const results = await page.evaluate((lim) => {
+  const grid = await page.evaluate((lim) => {
     const out = []; const seen = new Set();
-    for (const a of document.querySelectorAll('a[href^="/"]')) {
+    for (const a of document.querySelectorAll('a[href]')) {
       const href = a.getAttribute('href');
-      if (!href || seen.has(href)) continue;
-      const seg = href.split('/').filter(Boolean);
-      if (seg.length === 1 && !['explore', 'direct', 'reels', 'accounts'].includes(seg[0])) {
-        seen.add(href); out.push({ type: 'user', username: seg[0], url: 'https://www.instagram.com' + href, label: (a.innerText || '').replace(/\n/g, ' ').trim().slice(0, 120) });
-      } else if (seg[0] === 'explore' && seg[1] === 'tags') {
-        seen.add(href); out.push({ type: 'hashtag', tag: seg[2], url: 'https://www.instagram.com' + href });
-      } else if (seg[0] === 'p' || seg[0] === 'reel' || seg[0] === 'reels') {
-        seen.add(href); out.push({ type: seg[0] === 'p' ? 'post' : 'reel', url: 'https://www.instagram.com' + href, label: (a.querySelector('img')?.alt || '').slice(0, 160) });
-      }
+      if (!href) continue;
+      const m = href.match(/\/(p|reel|reels)\/([A-Za-z0-9_-]+)/);
+      if (!m) continue;
+      const kind = m[1] === 'p' ? 'p' : 'reel';
+      const key = `${kind}/${m[2]}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ type: kind === 'p' ? 'post' : 'reel', url: `https://www.instagram.com/${kind}/${m[2]}/`, label: (a.querySelector('img')?.alt || '').slice(0, 160) });
       if (out.length >= lim) break;
     }
     return out;
   }, limit).catch(() => []);
-  return { query, count: results.length, results, note: 'Halaman keyword IG = grid media bertema query; hasil user/hashtag muncul bila IG menampilkannya.' };
+  return { query, count: grid.length, results: grid, source: 'keyword-grid', note: 'Panel pencarian tidak terbuka; hasil ini grid media dari halaman keyword, bukan daftar akun. Untuk akun, panggil profile_get dengan username yang ditebak.' };
 }
 
 // ---------- LIKE / COMMENT ----------

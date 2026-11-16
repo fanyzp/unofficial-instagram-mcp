@@ -25,7 +25,7 @@
   "url": "https://www.instagram.com/"
  },
  "search": {
-  "_status": "[S] halaman hasil: https://www.instagram.com/explore/search/keyword/?q=<query> berisi link profil & hashtag",
+  "_status": "[V] panel Search di nav (klik ikon Search, ketik di input) menampilkan baris akun + hashtag; URL keyword di bawah ini hanya grid media dan dipakai sebagai cadangan",
   "url": "https://www.instagram.com/explore/search/keyword/?q="
  }
 }
