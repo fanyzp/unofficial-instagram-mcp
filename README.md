@@ -60,7 +60,31 @@ All actions use the visible Instagram web interface. The project does not call p
 - An Instagram account signed in in that browser
 - An MCP client, if you plan to use the MCP server
 
-## Install
+## Quick start (no clone needed)
+
+One command installs everything into your agent: it registers the MCP server and installs the Agent Skill. Pick your harness in the menu.
+
+```bash
+npx github:fanyzp/unofficial-instagram-mcp install
+```
+
+Or register the server in your MCP client config and let it run through npx directly:
+
+```json
+{
+  "mcpServers": {
+    "instagram": {
+      "command": "npx",
+      "args": ["-y", "github:fanyzp/unofficial-instagram-mcp"],
+      "env": { "CDP_URL": "http://127.0.0.1:9222", "IG_DRY_RUN": "true" }
+    }
+  }
+}
+```
+
+Then start Chrome as described below and call `ig_status`. Prefer working from source instead? Use the clone based install after this section.
+
+## Install from source
 
 ```bash
 git clone https://github.com/fanyzp/unofficial-instagram-mcp.git
@@ -93,19 +117,19 @@ The default CDP address is `http://127.0.0.1:9222`. Keep the debugging port avai
 
 ## Give this to your AI agent
 
-Paste this into your coding agent if you want it to install and register the server for you:
+Paste this into your coding agent if you want it to set everything up for you:
 
 ```text
-Install unofficial-instagram-mcp in this workspace, and learn how it works before using it.
+Set up unofficial-instagram-mcp for me and learn how it works before using it.
 
-Repository: https://github.com/fanyzp/unofficial-instagram-mcp
-
-1. Clone the repository, then read skills/unofficial-instagram-mcp/SKILL.md in full. It explains how the server works, the tool map, the workflows, and the safety rules. Follow it from now on.
-2. Run npm install. Copy .env.example to .env. Keep IG_DRY_RUN=true.
-3. Register the server and install the skill with the bundled installer: run `node bin/install.mjs --harness <your-harness> --scope user --yes` (harness ids: claude-code, opencode, cursor, codex, gemini-cli, generic). If your harness is not listed, register src/server.js as a local stdio MCP server named "instagram" with an absolute path, and copy the folder skills/unofficial-instagram-mcp into your agent skills directory, keeping the folder name unchanged so the skill loads in future sessions without a long briefing.
-5. Start Chrome with remote debugging on port 9222. I will sign in to Instagram manually. Do not ask for or store my password.
-6. Call ig_status first and confirm the signed-in username with me.
-7. Before sending a message or making a write action, show me the exact target and content. Do not disable dry run unless I approve it.
+1. Read the Agent Skill first: https://github.com/fanyzp/unofficial-instagram-mcp/blob/main/skills/unofficial-instagram-mcp/SKILL.md
+   It explains how the server works, the tool map, the workflows, and the safety rules. Follow it from now on.
+2. Run the installer for your own harness: npx github:fanyzp/unofficial-instagram-mcp install --harness <your-harness-id> --scope user --yes
+   Harness ids: claude-code, opencode, cursor, codex, gemini-cli, generic.
+   If your harness is not listed, register the server manually with command "npx" and args ["-y", "github:fanyzp/unofficial-instagram-mcp"], env CDP_URL=http://127.0.0.1:9222 and IG_DRY_RUN=true, and copy the skills/unofficial-instagram-mcp folder into your agent skills directory, keeping the folder name unchanged.
+3. Start Chrome with remote debugging on port 9222 if it is not running yet. I will sign in to Instagram manually. Do not ask for or store my password.
+4. Call ig_status first and confirm the signed-in username with me.
+5. Before any write action, show me the exact target and content. Do not disable dry run unless I approve it.
 ```
 
 ## MCP configuration
@@ -161,9 +185,17 @@ This repository ships an [Agent Skills](https://agentskills.io) skill at `skills
 
 Installing both is the intended setup. The skill loads by progressive disclosure, so the agent carries only its name and description in context and reads the full instructions when an Instagram task comes up, instead of needing a long briefing in every session.
 
-Three ways to install:
+Four ways to install:
 
-**1. The standard skills CLI.** The open Agent Skills installer discovers the skill in this repository and lets you choose which agents (harnesses) to install it to:
+**1. One command through npx (MCP server + skill together, no clone).** This is the bundled installer running straight from GitHub:
+
+```bash
+npx github:fanyzp/unofficial-instagram-mcp install
+```
+
+It asks for the scope and the harness, then registers the MCP server and installs the skill in one run. Non-interactive form: add `--harness <id> --scope user --yes`.
+
+**2. The standard skills CLI.** The open Agent Skills installer discovers the skill in this repository and lets you choose which agents (harnesses) to install it to:
 
 ```bash
 npx skills add fanyzp/unofficial-instagram-mcp
@@ -171,7 +203,7 @@ npx skills add fanyzp/unofficial-instagram-mcp
 
 Add `-g` for a user-wide install, or pin targets directly, for example `npx skills add fanyzp/unofficial-instagram-mcp -g -a claude-code -a opencode`. This installs the skill only; register the MCP server with the installer below or by hand.
 
-**2. The bundled installer (MCP server + skill together).** From a clone of this repository:
+**3. The bundled installer from a clone.** Same installer as route 1, run from a local clone of this repository:
 
 ```bash
 node bin/install.mjs
@@ -184,7 +216,7 @@ node bin/install.mjs --harness claude-code,opencode --scope user --yes
 node bin/install.mjs --all --scope project --dry-run
 ```
 
-**3. By hand.** Copy the folder into your agent's skills directory (for example `~/.claude/skills/` for Claude Code, or the skills directory your client documents), keeping the folder name `unofficial-instagram-mcp` unchanged:
+**4. By hand.** Copy the folder into your agent's skills directory (for example `~/.claude/skills/` for Claude Code, or the skills directory your client documents), keeping the folder name `unofficial-instagram-mcp` unchanged:
 
 ```bash
 cp -r skills/unofficial-instagram-mcp ~/.claude/skills/

@@ -16,12 +16,14 @@ user's password. All tools act on the visible web interface via Playwright over 
 
 ## Setup, if the server is not connected yet
 
-1. Clone https://github.com/fanyzp/unofficial-instagram-mcp and run `npm install`.
-2. Copy `.env.example` to `.env`. Keep `IG_DRY_RUN=true`.
-3. Chrome must run with `--remote-debugging-port=9222`. The user signs in to
+1. Fastest path: run `npx github:fanyzp/unofficial-instagram-mcp install --harness <your-harness-id> --scope user --yes`.
+   It registers the server and installs this skill in one run. Keep `IG_DRY_RUN=true`.
+   Manual alternative: register the server with command `npx` and args
+   `["-y", "github:fanyzp/unofficial-instagram-mcp"]`, env `CDP_URL=http://127.0.0.1:9222`
+   and `IG_DRY_RUN=true`. From a clone, register `src/server.js` by absolute path instead.
+2. Chrome must run with `--remote-debugging-port=9222`. The user signs in to
    Instagram manually in that window. Never ask for or store the password.
-4. Register `src/server.js` as a stdio MCP server named `instagram`, absolute path.
-5. Call `ig_status` first and confirm the signed-in username with the user.
+3. Call `ig_status` first and confirm the signed-in username with the user.
 
 ## Operating rules
 
