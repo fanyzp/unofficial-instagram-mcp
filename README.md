@@ -82,16 +82,6 @@ All actions use the visible Instagram web interface. The project does not call p
 - An Instagram account signed in in that browser
 - An MCP client, if you plan to use the MCP server
 
-## Updating
-
-Run the update command. It re-runs the installer with `--force`, which refreshes the Agent Skill files and rewrites the MCP registration with the latest version:
-
-```bash
-npx github:fanyzp/unofficial-instagram-mcp update
-```
-
-Installed from a clone instead? Run `git pull`, then `node bin/install.mjs --force`. If npx ever serves a stale cached copy, delete the `~/.npm/_npx` folder and run the command again. Or simply tell your agent: "update unofficial-instagram-mcp".
-
 ## Install from source
 
 ```bash
@@ -186,6 +176,16 @@ Add the server under the `mcp` key in `opencode.json`:
 ```
 
 After registration, restart the MCP client and ask the agent to call `ig_status`.
+
+## Updating
+
+Run the update command. It re-runs the installer with `--force`, which refreshes the Agent Skill files and rewrites the MCP registration with the latest version:
+
+```bash
+npx github:fanyzp/unofficial-instagram-mcp update
+```
+
+Installed from a clone instead? Run `git pull`, then `node bin/install.mjs --force`. If npx ever serves a stale cached copy, delete the `~/.npm/_npx` folder and run the command again. Or simply tell your agent: "update unofficial-instagram-mcp".
 
 ## Agent skill
 
