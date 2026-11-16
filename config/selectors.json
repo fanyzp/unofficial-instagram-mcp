@@ -1,31 +1,31 @@
 {
- "_comment": "Pemetaan UI Instagram Web. Status: [V] terverifikasi dari browser asli 16 Nov 2026, [S] standar IG web (label stabil) belum diuji live - uji dulu dengan IG_DRY_RUN=true.",
- "dm": {
-  "_status": "[V] inbox login OK; daftar thread menyusut jadi avatar saja di layout sempit (klik-scan adalah jalur utama); bubble=<article> kiri masuk/kanan keluar; composer placeholder 'Message...'; Send muncul setelah mengetik; header thread = heading nama + subteks username",
-  "composerInput": "div[role='textbox'][contenteditable='true']",
-  "inboxUrl": "https://www.instagram.com/direct/inbox/",
-  "messageBubble": "article",
-  "newMessageButton": "svg[aria-label='New message'], div[role='button']:has(svg[aria-label='New message'])",
-  "sendButton": "div[role='button']:has-text('Send'), button:has-text('Send')",
-  "threadListNav": "nav[aria-label='Thread list']"
- },
- "like": {
-  "_status": "[V] terverifikasi live 16 Nov 2026: Like -> hati merah + tombol jadi 'Unlike'; Save -> bookmark penuh + tombol jadi 'Remove'; like komentar bekerja dari hover.",
-  "likeBtn": "button:has(svg[aria-label='Like'])",
-  "unlikeBtn": "button:has(svg[aria-label='Unlike'])"
- },
- "post": {
-  "_status": "[V] terverifikasi live 16 Nov 2026: alur New post -> upload -> Next -> Share tampil 'Your post has been shared.'; hapus post via menu titik tiga -> Delete -> konfirmasi bekerja; balasan komentar tampil dengan awalan @mention otomatis dari IG; halaman hashtag /explore/tags/<tag>/ redirect ke halaman keyword search tetapi grid tetap termuat.",
-  "captionBox": "textarea[aria-label*='caption' i], div[role='textbox'][aria-label*='caption' i]",
-  "fileInput": "input[type='file'][accept*='image']",
-  "newPostBtn": "svg[aria-label='New post'], a:has(svg[aria-label='New post'])"
- },
- "profile": {
-  "_status": "[V-sebagian] rail kiri menampilkan link '<username>'s profile picture' = akun yang login; halaman profil: header berisi username, tombol, dan daftar posts/followers/following",
-  "url": "https://www.instagram.com/"
- },
- "search": {
-  "_status": "[V] panel Search di nav (klik ikon Search, ketik di input) menampilkan baris akun + hashtag; URL keyword di bawah ini hanya grid media dan dipakai sebagai cadangan",
-  "url": "https://www.instagram.com/explore/search/keyword/?q="
- }
+  "_comment": "Pemetaan UI Instagram Web. Status: [V] terverifikasi dari browser asli 16 Nov 2026, [S] standar IG web (label stabil) belum diuji live - uji dulu dengan IG_DRY_RUN=true.",
+  "dm": {
+    "_status": "[V] inbox login OK; daftar thread menyusut jadi avatar saja di layout sempit (klik-scan adalah jalur utama); bubble=<article> kiri masuk/kanan keluar; composer placeholder 'Message...'; Send muncul setelah mengetik; header thread = heading nama + subteks username",
+    "composerInput": "div[role='textbox'][contenteditable='true']",
+    "inboxUrl": "https://www.instagram.com/direct/inbox/",
+    "messageBubble": "article",
+    "newMessageButton": "svg[aria-label='New message'], div[role='button']:has(svg[aria-label='New message'])",
+    "sendButton": "div[role='button']:has-text('Send'), button:has-text('Send')",
+    "threadListNav": "nav[aria-label='Thread list']"
+  },
+  "like": {
+    "_status": "[V] terverifikasi live 16 Nov 2026: Like -> hati merah + tombol jadi 'Unlike'; Save -> bookmark penuh + tombol jadi 'Remove'; like komentar bekerja dari hover.",
+    "likeBtn": "button:has(svg[aria-label='Like'])",
+    "unlikeBtn": "button:has(svg[aria-label='Unlike'])"
+  },
+  "post": {
+    "_status": "[V] terverifikasi live 16 Nov 2026: alur New post -> upload -> Next -> Share tampil 'Your post has been shared.'; hapus post via menu titik tiga -> Delete -> konfirmasi bekerja; balasan komentar tampil dengan awalan @mention otomatis dari IG; halaman hashtag /explore/tags/<tag>/ redirect ke halaman keyword search tetapi grid tetap termuat.",
+    "captionBox": "textarea[aria-label*='caption' i], div[role='textbox'][aria-label*='caption' i]",
+    "fileInput": "input[type='file'][accept*='image']",
+    "newPostBtn": "svg[aria-label='New post'], a:has(svg[aria-label='New post'])"
+  },
+  "profile": {
+    "_status": "[V-sebagian] rail kiri menampilkan link '<username>'s profile picture' = akun yang login; halaman profil: header berisi username, tombol, dan daftar posts/followers/following; statistik followers/following di header adalah link href=\"#\" persis (dialog dibuka oleh script saat diklik, URL tidak berubah) - cari statistik dari teksnya, dialog dikenali dari judul h2 'Followers'/'Following', baris user berisi link profil relatif /<username>/",
+    "url": "https://www.instagram.com/"
+  },
+  "search": {
+    "_status": "[V] panel Search di nav (klik ikon Search, ketik di input) menampilkan baris akun + hashtag; URL keyword di bawah ini hanya grid media dan dipakai sebagai cadangan",
+    "url": "https://www.instagram.com/explore/search/keyword/?q="
+  }
 }

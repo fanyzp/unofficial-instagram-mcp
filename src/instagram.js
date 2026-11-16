@@ -409,31 +409,102 @@ export async function userUnfollow({ username }) {
   return { username, following: false, unfollowed: true };
 }
 
+// Mengumpulkan username dari baris user di dalam dialog followers/following.
+// Fungsi ini berjalan di dalam halaman (page.evaluate) dan juga dipakai
+// langsung oleh test fixture DOM (test/dom.test.mjs), jadi isinya harus
+// mandiri: tanpa referensi ke variabel luar.
+// Fakta terverifikasi 16 Nov 2026: baris dialog berisi link profil relatif
+// "/<username>/"; href absolut juga diterima (dinormalisasi ke pathname).
+// Link diterima sebagai baris user bila berisi avatar (img) atau teksnya
+// persis username, supaya link lain di dialog tidak ikut terambil.
+export function collectUsernamesFromDialog(limit) {
+  const RESERVED = new Set(['p', 'reel', 'reels', 'explore', 'stories', 'accounts', 'direct', 'tv', 'about', 'legal', 'developer', 'help', 'privacy', 'terms', 'api', 'instagram', 'followers', 'following', 'web', 'blog', 'jobs', 'press', 'meta', 'oauth', 'auth', 'settings', 'saved', 'tagged', 'locations', 'directory', 'your_activity', 'emails', 'invite', 'challenge', 'graphql', 'ajax', 'static']);
+  const root = document.querySelector('div[role="dialog"]') || document;
+  const out = []; const seen = new Set();
+  for (const a of root.querySelectorAll('a[href]')) {
+    let href = a.getAttribute('href') || '';
+    if (href.startsWith('http')) { try { href = new URL(href).pathname; } catch { continue; } }
+    if (!href.startsWith('/')) continue;
+    const seg = href.split('/').filter(Boolean);
+    if (seg.length !== 1) continue;
+    const name = seg[0];
+    if (RESERVED.has(name.toLowerCase())) continue;
+    if (!/^[A-Za-z0-9._]+$/.test(name)) continue;
+    const hasAvatar = Boolean(a.querySelector('img'));
+    if (!hasAvatar && (a.textContent || '').trim() !== name) continue;
+    if (seen.has(name)) continue;
+    seen.add(name); out.push(name);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+// Membuka dialog followers/following dari header profil.
+// Fakta terverifikasi 16 Nov 2026: statistik followers/following di header
+// adalah link dengan href "#" persis (bukan "/<user>/followers/"); dialog
+// dibuka oleh script saat statistik diklik, URL tidak berubah. Karena itu
+// statistik dicari dari teksnya ("681M followers", "307 followers", dst),
+// bukan dari href.
+async function openUserListDialog(page, kind) {
+  const byRole = page.getByRole('link', { name: new RegExp(kind, 'i') }).first();
+  if (await byRole.isVisible().catch(() => false)) {
+    await byRole.click().catch(() => {});
+  } else {
+    await page.evaluate((k) => {
+      const re = new RegExp(k, 'i');
+      const header = document.querySelector('header') || document;
+      const el = [...header.querySelectorAll('a, button, [role="link"], [role="button"]')].find((e) => re.test(e.textContent || ''));
+      if (el) el.click();
+    }, kind).catch(() => {});
+  }
+  for (let i = 0; i < 16; i++) {
+    const open = await page.evaluate((k) => {
+      const dlg = document.querySelector('div[role="dialog"]');
+      if (!dlg) return false;
+      const h = dlg.querySelector('h2, h1');
+      return (h?.textContent || '').trim().toLowerCase() === k;
+    }, kind).catch(() => false);
+    if (open) return true;
+    await sleep(500);
+  }
+  return false;
+}
+
 async function userList(page, username, kind, limit) {
   await page.goto(`https://www.instagram.com/${username}/`, { waitUntil: 'domcontentloaded' });
   await sleep(2500); await dismissDialogs(page);
-  const link = page.locator(`a[href$="/${kind}/"]`).first();
-  await link.click(); await sleep(2500);
-  const users = await page.evaluate((lim) => {
-    const dlg = document.querySelector('div[role="dialog"]') || document;
-    const out = []; const seen = new Set();
-    for (const a of dlg.querySelectorAll('a[href^="/"]')) {
-      const seg = a.getAttribute('href').split('/').filter(Boolean);
-      if (seg.length === 1 && !seen.has(seg[0])) { seen.add(seg[0]); out.push(seg[0]); if (out.length >= lim) break; }
-    }
-    return out;
-  }, limit).catch(() => []);
-  return users;
+  const opened = await openUserListDialog(page, kind);
+  if (!opened) {
+    return { users: [], dialogOpened: false, reason: `Dialog ${kind} tidak terbuka di profil @${username} (statistik tidak ditemukan / UI berubah / daftar tidak bisa dilihat akun ini).` };
+  }
+  let users = await page.evaluate(collectUsernamesFromDialog, limit).catch(() => []);
+  let rounds = 0; let stale = 0;
+  while (users.length < limit && rounds < 8 && stale < 2) {
+    const before = users.length;
+    await page.evaluate(() => {
+      const dlg = document.querySelector('div[role="dialog"]');
+      if (!dlg) return;
+      const sc = [...dlg.querySelectorAll('*')].find((e) => e.scrollHeight > e.clientHeight + 40 && /(auto|scroll)/.test(getComputedStyle(e).overflowY || ''));
+      const target = sc || dlg;
+      target.scrollTop = target.scrollHeight;
+    }).catch(() => {});
+    await sleep(1000);
+    users = await page.evaluate(collectUsernamesFromDialog, limit).catch(() => users);
+    stale = users.length > before ? 0 : stale + 1;
+    rounds++;
+  }
+  await page.keyboard.press('Escape').catch(() => {});
+  return { users, dialogOpened: true };
 }
 export async function followersList({ username, limit = 30 }) {
   const page = await getPage();
-  const users = await userList(page, username, 'followers', limit);
-  return { username, kind: 'followers', count: users.length, users };
+  const r = await userList(page, username, 'followers', limit);
+  return { username, kind: 'followers', count: r.users.length, users: r.users, dialogOpened: r.dialogOpened, ...(r.reason ? { reason: r.reason } : {}) };
 }
 export async function followingList({ username, limit = 30 }) {
   const page = await getPage();
-  const users = await userList(page, username, 'following', limit);
-  return { username, kind: 'following', count: users.length, users };
+  const r = await userList(page, username, 'following', limit);
+  return { username, kind: 'following', count: r.users.length, users: r.users, dialogOpened: r.dialogOpened, ...(r.reason ? { reason: r.reason } : {}) };
 }
 
 export async function commentLike({ url, match }) {
