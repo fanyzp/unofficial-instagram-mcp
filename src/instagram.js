@@ -97,6 +97,10 @@ export async function dmSend({ threadId, text }) {
 }
 
 // DM ke user TANPA thread yang sudah ada: buka profil -> tombol Message -> composer.
+// Dua layout terverifikasi: (1) halaman berpindah ke /direct/t/<id>;
+// (2) 16 Nov 2026: PANEL chat melayang terbuka di halaman profil (URL tidak
+// berubah) dengan composer "Message..." sendiri dan tombol Send yang baru
+// muncul setelah mengetik. Keduanya ditangani.
 export async function dmSendToUser({ username, text }) {
   const page = await getPage();
   await page.goto(`https://www.instagram.com/${username}/`, { waitUntil: 'domcontentloaded' });
@@ -104,9 +108,28 @@ export async function dmSendToUser({ username, text }) {
   const msgBtn = page.getByRole('button', { name: /message/i }).first();
   await msgBtn.click(); await sleep(2500);
   const m = page.url().match(/\/direct\/t\/(\d+)/);
-  if (!m) throw new Error('Tidak sampai ke halaman thread setelah klik Message.');
-  if (env.dryRun) return { sent: false, dryRun: true, wouldSend: text, username, threadId: m[1] };
-  return { ...(await dmSend({ threadId: m[1], text })), username };
+  if (m) {
+    if (env.dryRun) return { sent: false, dryRun: true, wouldSend: text, username, threadId: m[1] };
+    return { ...(await dmSend({ threadId: m[1], text })), username };
+  }
+  const box = page.locator(S.dm.composerInput).first();
+  let panelOpen = false;
+  for (let i = 0; i < 10 && !panelOpen; i++) {
+    panelOpen = await box.isVisible().catch(() => false);
+    if (!panelOpen) await sleep(500);
+  }
+  if (!panelOpen) throw new Error('Tidak sampai ke thread atau panel chat setelah klik Message.');
+  if (env.dryRun) {
+    await page.keyboard.press('Escape').catch(() => {});
+    return { sent: false, dryRun: true, wouldSend: text, username, via: 'chat-panel' };
+  }
+  await box.click();
+  await box.pressSequentially(text, { delay: 45 });
+  await sleep(800);
+  const send = page.locator(S.dm.sendButton).first();
+  if (await send.isVisible().catch(() => false)) await send.click(); else await box.press('Enter');
+  await sleep(1200);
+  return { sent: true, username, via: 'chat-panel', text };
 }
 
 // ---------- PROFILE ----------
@@ -143,6 +166,27 @@ export async function profileGet({ username } = {}) {
 }
 
 // ---------- SEARCH ----------
+// Pengambil baris hasil pencarian dari DOM. Mandiri supaya bisa diuji dengan
+// fixture (test/dom.test.mjs) dan dipakai page.evaluate apa adanya.
+export function extractSearchResults(limit) {
+  const out = []; const seen = new Set();
+  for (const a of document.querySelectorAll('a[href^="/"]')) {
+    const href = a.getAttribute('href');
+    if (!href || seen.has(href)) continue;
+    const seg = href.split('/').filter(Boolean);
+    const label = (a.innerText || '').replace(/\s*\n\s*/g, ' | ').trim().slice(0, 140);
+    if (seg.length === 1 && !['explore', 'direct', 'reels', 'accounts', 'stories'].includes(seg[0])) {
+      // Baris akun punya avatar; lewati link nav polos tanpa gambar.
+      if (!a.querySelector('img')) continue;
+      seen.add(href); out.push({ type: 'user', username: seg[0], url: 'https://www.instagram.com' + href, label });
+    } else if (href.includes('/explore/search/keyword/') || (seg[0] === 'explore' && seg[1] === 'tags')) {
+      seen.add(href); out.push({ type: 'hashtag', url: 'https://www.instagram.com' + href, label });
+    }
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
 export async function search({ query, limit = 15 }) {
   const page = await getPage();
   await page.goto('https://www.instagram.com/', { waitUntil: 'domcontentloaded' });
@@ -154,29 +198,28 @@ export async function search({ query, limit = 15 }) {
   try {
     const icon = page.locator('svg[aria-label="Search" i], svg[aria-label="Cari" i]').first();
     await icon.click({ timeout: 5000 });
-    await sleep(1200);
+    await sleep(1500);
     const input = page.locator('input[placeholder*="Search" i], input[placeholder*="Cari" i]').first();
-    await input.click({ timeout: 5000 });
-    await input.pressSequentially(query, { delay: 60 });
+    // Input bisa tertutup tombol pill-nya (layout explore: input di dalam
+    // tombol "Search" yang harus diklik dulu) atau panel yang masih bergerak,
+    // sehingga klik biasa gagal uji actionability. Berlapis: klik biasa ->
+    // klik tombol pill -> klik paksa -> fokus via DOM. Mengetik lewat keyboard
+    // halaman (masuk ke elemen yang fokus), bukan locator, lalu nilai input
+    // diperiksa; bila kosong, ulangi lewat pressSequentially.
+    const clicked = await input.click({ timeout: 3000 }).then(() => true).catch(() => false);
+    if (!clicked) {
+      const pill = page.getByRole('button', { name: /^search$/i }).first();
+      if (await pill.isVisible().catch(() => false)) await pill.click().catch(() => {});
+      await sleep(600);
+      const forced = await input.click({ timeout: 3000, force: true }).then(() => true).catch(() => false);
+      if (!forced) await input.evaluate((el) => { el.focus(); el.click(); }).catch(() => {});
+    }
+    await page.keyboard.type(query, { delay: 60 });
+    await sleep(600);
+    const val = await input.evaluate((el) => el.value || '').catch(() => '');
+    if (!val) { await input.pressSequentially(query, { delay: 60 }).catch(() => {}); }
     await sleep(2800);
-    results = await page.evaluate((lim) => {
-      const out = []; const seen = new Set();
-      for (const a of document.querySelectorAll('a[href^="/"]')) {
-        const href = a.getAttribute('href');
-        if (!href || seen.has(href)) continue;
-        const seg = href.split('/').filter(Boolean);
-        const label = (a.innerText || '').replace(/\s*\n\s*/g, ' | ').trim().slice(0, 140);
-        if (seg.length === 1 && !['explore', 'direct', 'reels', 'accounts', 'stories'].includes(seg[0])) {
-          // Baris akun punya avatar; lewati link nav polos tanpa gambar.
-          if (!a.querySelector('img')) continue;
-          seen.add(href); out.push({ type: 'user', username: seg[0], url: 'https://www.instagram.com' + href, label });
-        } else if (href.includes('/explore/search/keyword/') || (seg[0] === 'explore' && seg[1] === 'tags')) {
-          seen.add(href); out.push({ type: 'hashtag', url: 'https://www.instagram.com' + href, label });
-        }
-        if (out.length >= lim) break;
-      }
-      return out;
-    }, limit);
+    results = await page.evaluate(extractSearchResults, limit);
   } catch { results = []; }
   if (results.length) return { query, count: results.length, results, source: 'search-panel' };
   // Cadangan: halaman keyword (grid media bertema query).
@@ -307,21 +350,102 @@ export async function postGet({ url }) {
   return { url, ...data, author: fromUrl || data.author || '' };
 }
 
+// Pengambil komentar dari DOM halaman post. Struktur terverifikasi 16 Nov
+// 2026: komentar adalah blok bertumpuk di kolom kanan (BUKAN ul/li): avatar,
+// username + waktu, teks, lalu baris "N likes" + "Reply", dan tombol hati
+// berlabel "Like" di kanan baris. Baris ditanam dari elemen daun "Reply"
+// (baris caption tidak punya Reply, jadi tidak ikut terambil), lalu naik ke
+// wadah terkecil yang memuat tombol Like komentar dan link avatar. Mandiri
+// supaya bisa diuji dengan fixture (test/dom.test.mjs).
+export function extractCommentsFromPage(limit) {
+  const out = []; const seen = new Set();
+  const isAvatarLink = (a) => {
+    const seg = (a.getAttribute('href') || '').split('/').filter(Boolean);
+    return seg.length === 1 && !!a.querySelector('img');
+  };
+  const replyLeaves = [...document.querySelectorAll('a, button, span, div')]
+    .filter((e) => e.children.length === 0 && (e.textContent || '').trim() === 'Reply');
+  for (const leaf of replyLeaves) {
+    let row = leaf; let ok = false;
+    for (let i = 0; i < 7 && row.parentElement; i++) {
+      row = row.parentElement;
+      if ((row.innerText || '').length > 1500) break;
+      const hasLike = !!row.querySelector('svg[aria-label="Like" i], svg[aria-label="Unlike" i], button[aria-label="Like" i], button[aria-label="Unlike" i]');
+      const hasAvatar = [...row.querySelectorAll('a[href^="/"]')].some(isAvatarLink);
+      if (hasLike && hasAvatar) { ok = true; break; }
+    }
+    if (!ok) continue;
+    const avatar = [...row.querySelectorAll('a[href^="/"]')].find(isAvatarLink);
+    const username = (avatar.getAttribute('href') || '').split('/').filter(Boolean)[0];
+    const lines = (row.innerText || '').split('\n').map((s) => s.trim()).filter(Boolean);
+    const body = [];
+    for (let line of lines) {
+      if (line === username) continue;
+      if (line.startsWith(username + ' ')) {
+        line = line.slice(username.length).trim();
+        if (/^\d+\s*[smhdw]$/i.test(line)) continue; // sisa baris hanya waktu
+        if (!line) continue;
+      }
+      if (/^Verified$/i.test(line)) continue;
+      if (/^\d+\s*[smhdw]$/i.test(line)) continue;
+      if (/likes?\b/i.test(line) && /\bReply\b/.test(line)) continue; // baris meta gabungan
+      if (/^[\d.,]+\s*likes?$/i.test(line)) continue;
+      if (/^Reply$/i.test(line)) continue;
+      if (/^See translation$/i.test(line)) continue;
+      if (/^(View|Hide) (all )?\d+ replies$/i.test(line)) continue;
+      body.push(line);
+    }
+    const text = body.join(' ').trim();
+    if (!text) continue;
+    const key = username + '|' + text;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ username, text: text.slice(0, 400) });
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+// Tandai tombol like milik SATU komentar (yang teksnya memuat `match`) dengan
+// atribut data-mcp-like-target supaya bisa diklik lewat locator. Mengembalikan
+// 'like' (belum disukai), 'unlike' (sudah disukai), atau null (tidak ketemu).
+// Baris kandidat terkecil yang memuat teksnya menang, supaya tombol like
+// postingan utama tidak ikut tertandai.
+export function tagCommentLikeButton(match) {
+  document.querySelectorAll('[data-mcp-like-target]').forEach((e) => e.removeAttribute('data-mcp-like-target'));
+  const rows = [...document.querySelectorAll('div, li')]
+    .filter((e) => (e.innerText || '').includes(match) && (e.innerText || '').length <= 1500);
+  rows.sort((a, b) => (a.innerText || '').length - (b.innerText || '').length);
+  for (const row of rows) {
+    const unlike = row.querySelector('svg[aria-label="Unlike" i]');
+    if (unlike) { (unlike.closest('button, [role="button"]') || unlike).setAttribute('data-mcp-like-target', 'unlike'); return 'unlike'; }
+    const like = row.querySelector('svg[aria-label="Like" i]');
+    if (like) { (like.closest('button, [role="button"]') || like).setAttribute('data-mcp-like-target', 'like'); return 'like'; }
+  }
+  return null;
+}
+
 export async function postComments({ url, limit = 20 }) {
   const page = await getPage();
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await sleep(3000); await dismissDialogs(page);
-  const comments = await page.evaluate((lim) => {
-    const out = []; const seen = new Set();
-    for (const li of document.querySelectorAll('article ul li, main ul li')) {
-      const t = (li.innerText || '').replace(/\s+/g, ' ').trim();
-      if (!t || t.length < 3 || seen.has(t)) continue;
-      seen.add(t); out.push({ text: t.slice(0, 400) });
-      if (out.length >= lim) break;
-    }
-    return out;
-  }, limit).catch(() => []);
-  return { url, count: comments.length, comments, note: 'Teks komentar apa adanya dari halaman (memuat username, isi, dan metadata seperti waktu/tombol Reply bila tampil).' };
+  let comments = await page.evaluate(extractCommentsFromPage, limit).catch(() => []);
+  // Kolom komentar scroll terpisah; gulir untuk memuat lebih banyak baris
+  // sampai limit tercapai atau tidak ada pertumbuhan.
+  let stale = 0;
+  for (let round = 0; round < 6 && comments.length < limit && stale < 2; round++) {
+    const before = comments.length;
+    await page.evaluate(() => {
+      const art = document.querySelector('article') || document.querySelector('main');
+      if (!art) return;
+      const sc = [...art.querySelectorAll('div')].find((d) => d.scrollHeight > d.clientHeight + 40 && /(auto|scroll)/.test(getComputedStyle(d).overflowY));
+      if (sc) sc.scrollTop = sc.scrollHeight; else window.scrollTo(0, document.body.scrollHeight);
+    }).catch(() => {});
+    await sleep(1200);
+    comments = await page.evaluate(extractCommentsFromPage, limit).catch(() => comments);
+    stale = comments.length > before ? 0 : stale + 1;
+  }
+  return { url, count: comments.length, comments };
 }
 
 export async function feedHome({ limit = 10 } = {}) {
@@ -511,15 +635,19 @@ export async function commentLike({ url, match }) {
   const page = await getPage();
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await sleep(3000); await dismissDialogs(page);
-  const li = page.locator('li, div', { hasText: match }).last();
-  await li.hover().catch(() => {});
-  await sleep(500);
-  const heart = li.locator('svg[aria-label="Like"]').first();
-  const found = await heart.isVisible().catch(() => false);
-  if (!found) return { liked: false, reason: 'Tombol like komentar tidak ditemukan (komentar/selector berubah).', url, match };
+  // Tombol like komentar adalah tombol berlabel "Like" di kanan barisnya
+  // (selalu terlihat, bukan hover). Barisnya ditandai dari dalam halaman
+  // (baris terkecil yang memuat teks komentar) lalu diklik lewat locator,
+  // supaya tombol like postingan utama tidak salah klik.
+  const state = await page.evaluate(tagCommentLikeButton, match).catch(() => null);
+  if (state === 'unlike') return { liked: true, alreadyLiked: true, match, url };
+  if (!state) return { liked: false, reason: `Komentar memuat "${match}" / tombol like-nya tidak ditemukan di halaman ini.`, url, match };
   if (env.dryRun) return { liked: false, dryRun: true, likeButtonFound: true, match, url };
-  await heart.click(); await sleep(800);
-  return { liked: true, match, url };
+  await page.locator('[data-mcp-like-target="like"]').first().click();
+  await sleep(800);
+  const after = await page.evaluate(tagCommentLikeButton, match).catch(() => null);
+  await page.evaluate(() => document.querySelectorAll('[data-mcp-like-target]').forEach((e) => e.removeAttribute('data-mcp-like-target'))).catch(() => {});
+  return { liked: after === 'unlike', match, url };
 }
 
 export async function postSave({ url }) {
