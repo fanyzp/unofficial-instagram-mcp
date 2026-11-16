@@ -2,7 +2,7 @@
 
 Live verification of every tool, run against a real signed-in session.
 
-- **Last checked:** 16 November 2026, 14:42-15:08 WITA (UTC+8)
+- **Last checked:** 16 November 2026, 14:42-15:44 WITA (UTC+8)
 - **Tested on:** Google Chrome, Linux
 - **Test account:** a second account
 
@@ -58,4 +58,5 @@ The tools detect this and report it clearly instead of failing silently. Story c
 - Replies sent with `post_reply_to_comment` display with an @mention prefix, which Instagram adds automatically.
 - The hashtag page URL redirects to the keyword search page; the post grid still loads and `hashtag_posts` collects it normally.
 - On a private account, a re-follow ends in the `Requested` state until the owner approves it. `user_follow` reports that state as it is. In this run the owner approved the request and the end state matched the starting state (`Following`).
+- A second round on the same day re-verified `search`, `user_posts`, `profile_get`, and `post_get` after fixes prompted by real agent use: search now goes through the nav search panel and returns account rows with avatars, profile grids return their full post list (12 unique posts sampled), profile stats read from the header, and a post's author is read from the article header, so a tagged account that appears earlier in the article is no longer mistaken for the author.
 - The local protocol test suite (`npm test`) passes in full: handshake, tool discovery for all 34 tools, annotations, server instructions, ping, unknown methods, graceful error without a browser, and the self-test gate that refuses the full level without its safety settings.
