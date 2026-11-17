@@ -1,15 +1,14 @@
 {
-  "dependencies": {
-    "playwright-core": "^1.49.0"
-  },
-  "description": "Instagram, now accessible to your AI agent. An unofficial MCP server for Instagram Web with MCP, CLI, and TUI interfaces.",
-  "engines": {
-    "node": ">=20"
-  },
-  "license": "MIT",
-  "main": "src/server.js",
   "name": "unofficial-instagram-mcp",
-  "private": true,
+  "version": "0.3.0",
+  "description": "Instagram, now accessible to your AI agent. An unofficial MCP server for Instagram Web with MCP, CLI, and TUI interfaces.",
+  "mcpName": "io.github.fanyzp/unofficial-instagram-mcp",
+  "type": "module",
+  "main": "src/server.js",
+  "bin": {
+    "unofficial-instagram-mcp": "bin/run.mjs",
+    "unofficial-instagram-mcp-install": "bin/install.mjs"
+  },
   "scripts": {
     "check": "node --check src/server.js && node --check src/browser.js && node --check src/instagram.js && node --check src/tools.js && node --check src/cli.js && node --check src/tui.js && node --check src/selftest.js && node --check src/watcher.js && node --check src/run-selftest.js && node --check bin/install.mjs && echo SYNTAX-OK",
     "cli": "node src/cli.js",
@@ -19,11 +18,46 @@
     "selftest": "node src/run-selftest.js",
     "install:agent": "node bin/install.mjs"
   },
-  "type": "module",
-  "version": "0.3.0",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "instagram",
+    "ai-agent",
+    "ai-agents",
+    "automation",
+    "playwright",
+    "dm-automation"
+  ],
   "author": "fanyzp",
-  "bin": {
-    "unofficial-instagram-mcp": "bin/run.mjs",
-    "unofficial-instagram-mcp-install": "bin/install.mjs"
+  "license": "MIT",
+  "homepage": "https://github.com/fanyzp/unofficial-instagram-mcp#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fanyzp/unofficial-instagram-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/fanyzp/unofficial-instagram-mcp/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "bin",
+    "src",
+    "config",
+    "skills",
+    "docs/assets",
+    "README.md",
+    "LICENSE",
+    ".env.example",
+    "server.json",
+    "smithery.yaml",
+    "glama.json"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "playwright-core": "^1.49.0"
   }
 }

@@ -1,0 +1,33 @@
+# Smithery configuration file: https://smithery.ai/docs/build/project-config
+# This is a local stdio server. It connects to a Chrome window the user
+# has already signed in to Instagram. It does not use the Meta API and
+# never asks for or stores an Instagram password.
+
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    properties:
+      cdpUrl:
+        type: string
+        description: "Chrome DevTools Protocol URL of a Chrome window already signed in to Instagram."
+        default: "http://127.0.0.1:9222"
+      igDryRun:
+        type: string
+        description: "When 'true', write tools (DM, like, post) are simulated only. Keep 'true' while testing."
+        default: "true"
+        enum:
+          - "true"
+          - "false"
+  commandFunction: |-
+    (config) => ({
+      command: 'npx',
+      args: ['-y', 'unofficial-instagram-mcp'],
+      env: {
+        CDP_URL: config.cdpUrl || 'http://127.0.0.1:9222',
+        IG_DRY_RUN: config.igDryRun || 'true'
+      }
+    })
+  exampleConfig:
+    cdpUrl: "http://127.0.0.1:9222"
+    igDryRun: "true"
