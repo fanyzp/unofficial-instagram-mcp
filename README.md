@@ -6,6 +6,10 @@
 
 <p align="center">Instagram, now accessible to your AI agent.</p>
 
+<p align="center">
+  <a href="https://mcpservers.org/servers/fanyzp/unofficial-instagram-mcp"><img src="https://mcpservers.org/badge.svg" alt="Listed on mcpservers.org"></a>
+</p>
+
 An unofficial Model Context Protocol (MCP) server for Instagram Web. It gives an AI agent a set of focused tools for messages, profiles, posts, comments, stories, and notifications.
 
 The server connects to a Chrome window that is already signed in to Instagram. It does not use the Meta API, and it does not ask for or store an Instagram password.
